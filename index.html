@@ -456,8 +456,9 @@
           const integrityAttr = latestEntry.js_sha256
             ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
             : "";
+          const pyodideUrl = latestEntry.pyodide_url || "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
           snippetEl.querySelector("code").textContent =
-            `<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"><\/script>
+            `<script src="${pyodideUrl}"><\/script>
 <script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
         } else if (data.latest) {
           statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;

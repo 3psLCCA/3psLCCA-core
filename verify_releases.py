@@ -31,9 +31,15 @@ DIST_DIR = ROOT / "dist"
 
 def sha256_file(path):
     digest = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            digest.update(chunk)
+    if path.suffix == ".js":
+        # Normalize line endings to LF for JS files to match git/pages origin
+        text = path.read_text(encoding="utf-8")
+        normalized = text.replace("\r\n", "\n")
+        digest.update(normalized.encode("utf-8"))
+    else:
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                digest.update(chunk)
     return digest.hexdigest()
 
 

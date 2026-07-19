@@ -10,7 +10,6 @@
   <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
   <link rel="stylesheet" href="./assets/site.css" />
   <script src="./assets/theme.js"></script>
-  <script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jshint@2.13.6/dist/jshint.js"></script>
   <style>
     .clearall {
@@ -64,6 +63,12 @@
     #versionSelect option {
       background-color: #15161b;
       color: #e7e9ee;
+    }
+
+    #pyodideVersionLabel {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-faint);
     }
 
     /* Light theme overrides */
@@ -335,6 +340,7 @@
         <select id="versionSelect">
           <option value="" disabled selected>Loading...</option>
         </select>
+        <span id="pyodideVersionLabel"></span>
       </div>
       <button id="btnRunAll" class="runall" type="button" disabled>▶ run all</button>
       <button id="btnClearAll" class="runall clearall" type="button">✕ clear all</button>
@@ -390,15 +396,7 @@
           script.integrity = `sha256-${hexToBase64(sha256)}`;
           script.crossOrigin = "anonymous";
         }
-        script.onload = () => {
-          api = window.ThreePsLccaCore;
-          if (api) {
-            getState = api.getState;
-            resolve();
-          } else {
-            reject(new Error("window.ThreePsLccaCore is not defined after script load"));
-          }
-        };
+        script.onload = () => resolve();
         script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
         document.head.appendChild(script);
       });
@@ -446,11 +444,26 @@
           throw new Error(`Could not find release configuration for version ${targetVersion}`);
         }
 
-        setStatus(`Loading 3pslccacore.js ${entryToLoad.version}...`);
-        const scriptUrl = `${entryToLoad.url}/3pslccacore.js`;
-        return loadScript(scriptUrl, entryToLoad.js_sha256);
+        const pyodideUrl = entryToLoad.pyodide_url || "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+
+        // Parse and display Pyodide version
+        const match = pyodideUrl.match(/\/pyodide\/(v?[0-9.]+)/) || pyodideUrl.match(/pyodide@(v?[0-9.]+)/) || pyodideUrl.match(/\/([v0-9.]+)\/full\//);
+        const pyodideVer = match ? (match[1].startsWith('v') ? match[1] : 'v' + match[1]) : 'WASM';
+        document.getElementById("pyodideVersionLabel").textContent = `(Pyodide: ${pyodideVer})`;
+
+        setStatus(`Loading Pyodide...`);
+        return loadScript(pyodideUrl).then(() => {
+          setStatus(`Loading 3pslccacore.js ${entryToLoad.version}...`);
+          const scriptUrl = `${entryToLoad.url}/3pslccacore.js`;
+          return loadScript(scriptUrl, entryToLoad.js_sha256);
+        });
       })
       .then(() => {
+        api = window.ThreePsLccaCore;
+        if (!api) {
+          throw new Error("window.ThreePsLccaCore is not defined after script load");
+        }
+        getState = api.getState;
         setStatus("Not initialized.");
         document.querySelectorAll(".cell-run").forEach(btn => btn.disabled = false);
         document.getElementById("btnRunAll").disabled = false;
