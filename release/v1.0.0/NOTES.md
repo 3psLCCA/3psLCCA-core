@@ -12,7 +12,7 @@ everything runs in the browser.
 ## Quick start
 
 ```html
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script>
 <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"></script>
 <script>
   const { sample, performAnalysis } = window.ThreePsLccaCore;
