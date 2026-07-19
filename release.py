@@ -18,7 +18,10 @@ locally), and the staged release/vX.Y.Z/ folder -- into release/_publish/
 locally. Copy that folder's *contents* onto the web branch yourself
 (checkout web, copy, `git add -A`, commit, push) -- that part is manual.
 
-Releases built with release=true are automatically marked "published": true in releases.json, so future runs of this script carry it forward into the filtered payload for later releases automatically.
+Ledger entries start "published": false; the flag is set to true by hand
+after a release is actually pushed on the web branch (see DEVELOPER.md).
+This script's filtered payload always includes the version currently being
+released even while its flag is still false.
 
 Usage, after a production wheel build:
 

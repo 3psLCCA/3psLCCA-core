@@ -73,7 +73,10 @@ this absolute URL is the fallback for currentScript-less contexts
 (ES-module imports, bundler inlining). releases.json's release-kind entries record
 that same computed URL, plus the sha256 of *both* staged files (wheel_sha256
 and js_sha256) -- enough for an HTML page to link/verify a release without
-recomputing anything. Releases built with release=true are automatically marked "published": true in the ledger so they are ready to be served immediately once pushed.
+recomputing anything. Every entry starts with "published": false -- building
+only stages locally. Set it to true by hand after the release is actually
+pushed on the web branch (the manual publish flow in DEVELOPER.md), so the
+ledger reflects what is really live.
 """
 
 import datetime
@@ -304,8 +307,10 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
         "notes": notes,
         "pyodide_url": pyodide_url,
         "commit": _git_commit(),
-        # Automatically mark as published if this is a confirmed final release build
-        "published": release_confirmed and not parsed_version.is_prerelease,
+        # Building only stages locally -- nothing is live yet. Publishing is
+        # the manual step (commit + push on web, see DEVELOPER.md), and
+        # flipping this to true afterward is part of it.
+        "published": False,
     }
     versions.append(entry)
 
