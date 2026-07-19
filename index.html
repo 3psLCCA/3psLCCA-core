@@ -8,163 +8,9 @@
   <meta name="description"
     content="Published browser/Pyodide releases of 3pslccacore.js — the single script you need for in-browser LCCA." />
   <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
+  <link rel="stylesheet" href="./assets/site.css" />
+  <script src="./assets/theme.js"></script>
   <style>
-    :root {
-      --bg: #0a0b10;
-      --surface: rgba(255, 255, 255, 0.03);
-      --surface-2: rgba(255, 255, 255, 0.055);
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #e7e9ee;
-      --text-dim: #9aa1b2;
-      --text-faint: #626a7d;
-      --accent: #7c8cff;
-      --accent-2: #4dd6c1;
-      --danger: #ff6b7a;
-      --warn: #f0b429;
-      --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
-      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      color-scheme: dark;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 15px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      background:
-        radial-gradient(50rem 30rem at 80% -10%, rgba(124, 140, 255, 0.13), transparent 60%),
-        radial-gradient(40rem 26rem at 5% 10%, rgba(77, 214, 193, 0.07), transparent 60%);
-    }
-
-    a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    code {
-      font-family: var(--mono);
-      font-size: 0.86em;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      padding: 0.1em 0.4em;
-      border-radius: 6px;
-    }
-
-    .wrap {
-      max-width: 60rem;
-      margin: 0 auto;
-      padding: 0 1.25rem;
-    }
-
-    /* ---- nav ---- */
-    nav {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      background: rgba(10, 11, 16, 0.75);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-inner {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      height: 3.5rem;
-    }
-
-    .brand {
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .brand:hover {
-      text-decoration: none;
-    }
-
-    .brand .logo {
-      width: 1.7rem;
-      height: 1.7rem;
-      object-fit: contain;
-      border-radius: 6px;
-    }
-
-    .nav-links {
-      margin-left: auto;
-      display: flex;
-      gap: 0.25rem;
-    }
-
-    .nav-links a {
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 8px;
-    }
-
-    .nav-links a:hover {
-      color: var(--text);
-      background: var(--surface-2);
-      text-decoration: none;
-    }
-
-    .nav-links a.active {
-      color: var(--text);
-      background: var(--surface-2);
-    }
-
-    @media (max-width: 40rem) {
-      .wrap {
-        padding: 0 0.9rem;
-      }
-
-      .nav-inner {
-        gap: 0.6rem;
-      }
-
-      .nav-links a {
-        font-size: 0.8rem;
-        padding: 0.3rem 0.45rem;
-      }
-
-      .brand {
-        font-size: 0.95rem;
-      }
-    }
-
-    @media (max-width: 26rem) {
-      .brand-text {
-        display: none;
-      }
-    }
-
     /* ---- hero ---- */
     header {
       padding: 4.5rem 0 3rem;
@@ -185,7 +31,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.1;
-      background: linear-gradient(90deg, #fff 30%, #9aa8ff 75%, var(--accent-2));
+      background: linear-gradient(90deg, var(--h1-grad-from) 30%, var(--h1-grad-mid) 75%, var(--accent-2));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -271,7 +117,7 @@
 
     /* ---- snippet card ---- */
     .snippet {
-      background: #07080c;
+      background: var(--code-bg);
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
@@ -295,7 +141,7 @@
       font-family: var(--mono);
       font-size: 0.78rem;
       line-height: 1.6;
-      color: #b8c1d9;
+      color: var(--code-text);
       overflow-x: auto;
     }
 
@@ -390,7 +236,7 @@
 
     .tag.latest {
       color: #0a0b10;
-      background: var(--accent-2);
+      background: #4dd6c1;
     }
 
     .tag.pre {
@@ -400,7 +246,7 @@
 
     .tag.warn {
       color: #0a0b10;
-      background: var(--warn);
+      background: #f0b429;
     }
 
     .sha {
@@ -409,23 +255,6 @@
       color: var(--text-faint);
     }
 
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 0 2rem;
-      color: var(--text-faint);
-      font-size: 0.82rem;
-    }
-
-    .foot-inner {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem 2rem;
-      justify-content: space-between;
-    }
-
-    footer a {
-      color: var(--text-dim);
-    }
   </style>
   <script src="./release/v1.0.0/3pslccacore.js"></script>
 </head>
@@ -441,6 +270,7 @@
         <a href="./lcca-notebook.html">Notebook</a>
         <a href="./view_documentation.html">Docs</a>
         <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">🌓</button>
       </div>
     </div>
   </nav>

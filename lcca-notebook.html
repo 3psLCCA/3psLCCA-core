@@ -8,239 +8,13 @@
   <meta name="description"
     content="An editable JavaScript notebook for 3pslccacore.js - tweak the inputs, run each cell, and watch the LCCA output change." />
   <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
+  <link rel="stylesheet" href="./assets/site.css" />
+  <script src="./assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
   <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"
     integrity="sha256-qgawHfOZqxF/QEf+rp7SEecZMYlOrdnP/zcY0qVXM68=" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/jshint@2.13.6/dist/jshint.js"></script>
   <style>
-    :root {
-      --bg: #0a0b10;
-      --surface: rgba(255, 255, 255, 0.03);
-      --surface-2: rgba(255, 255, 255, 0.055);
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #e7e9ee;
-      --text-dim: #9aa1b2;
-      --text-faint: #626a7d;
-      --accent: #7c8cff;
-      --accent-2: #4dd6c1;
-      --danger: #ff6b7a;
-      --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
-      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      color-scheme: dark;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 15px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      background:
-        radial-gradient(50rem 30rem at 80% -10%, rgba(124, 140, 255, 0.13), transparent 60%),
-        radial-gradient(40rem 26rem at 5% 10%, rgba(77, 214, 193, 0.07), transparent 60%);
-    }
-
-    a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    code {
-      font-family: var(--mono);
-      font-size: 0.86em;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      padding: 0.1em 0.4em;
-      border-radius: 6px;
-    }
-
-    .wrap {
-      max-width: 60rem;
-      margin: 0 auto;
-      padding: 0 1.25rem;
-    }
-
-    nav {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      background: rgba(10, 11, 16, 0.75);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-inner {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      height: 3.5rem;
-    }
-
-    .brand {
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .brand:hover {
-      text-decoration: none;
-    }
-
-    .brand .logo {
-      width: 1.7rem;
-      height: 1.7rem;
-      object-fit: contain;
-      border-radius: 6px;
-    }
-
-    .nav-links {
-      margin-left: auto;
-      display: flex;
-      gap: 0.25rem;
-    }
-
-    .nav-links a {
-      color: var(--text-dim);
-      font-size: 0.88rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 8px;
-    }
-
-    .nav-links a:hover {
-      color: var(--text);
-      background: var(--surface-2);
-      text-decoration: none;
-    }
-
-    .nav-links a.active {
-      color: var(--text);
-      background: var(--surface-2);
-    }
-
-    @media (max-width: 40rem) {
-      .wrap {
-        padding: 0 0.9rem;
-      }
-
-      .nav-inner {
-        gap: 0.6rem;
-      }
-
-      .nav-links a {
-        font-size: 0.8rem;
-        padding: 0.3rem 0.45rem;
-      }
-
-      .brand {
-        font-size: 0.95rem;
-      }
-    }
-
-    @media (max-width: 26rem) {
-      .brand-text {
-        display: none;
-      }
-    }
-
-    .statusbar {
-      position: sticky;
-      top: 3.5rem;
-      z-index: 40;
-      background: rgba(10, 11, 16, 0.75);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .status-inner {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.5rem 0;
-    }
-
-    .status-dot {
-      flex: 0 0 auto;
-      width: 0.55rem;
-      height: 0.55rem;
-      border-radius: 50%;
-      background: var(--accent-2);
-      box-shadow: 0 0 8px var(--accent-2);
-      animation: pulse 2.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.35;
-      }
-    }
-
-    #status {
-      margin: 0;
-      font-size: 0.85rem;
-      font-weight: 550;
-      font-family: var(--mono);
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .runall {
-      margin-left: auto;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      border-radius: 8px;
-      padding: 0.25rem 0.8rem;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .runall:hover:not(:disabled) {
-      color: var(--text);
-      border-color: var(--accent);
-    }
-
-    .runall:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
     .clearall {
       margin-left: 0;
     }
@@ -269,7 +43,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       line-height: 1.1;
-      background: linear-gradient(90deg, #fff 30%, #9aa8ff 75%, var(--accent-2));
+      background: linear-gradient(90deg, var(--h1-grad-from) 30%, var(--h1-grad-mid) 75%, var(--accent-2));
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -339,8 +113,8 @@
     .cell-code {
       display: block;
       width: 100%;
-      background: #07080c;
-      color: #b8c1d9;
+      background: var(--code-bg);
+      color: var(--code-text);
       font-family: var(--mono);
       font-size: 0.8rem;
       line-height: 1.6;
@@ -402,8 +176,8 @@
     .cell-out {
       margin: 0;
       border-top: 1px solid var(--border);
-      background: #07080c;
-      color: #b8c1d9;
+      background: var(--code-bg);
+      color: var(--code-text);
       font-family: var(--mono);
       font-size: 0.78rem;
       line-height: 1.6;
@@ -429,7 +203,7 @@
       font-family: var(--mono);
       font-size: 0.72rem;
       line-height: 1.5;
-      color: #f0b429;
+      color: var(--warn);
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -448,7 +222,7 @@
     }
 
     .cell-lint .lint-warn {
-      color: #f0b429;
+      color: var(--warn);
     }
 
     .cell-lint-state {
@@ -462,30 +236,13 @@
     }
 
     .cell-lint-state.warn {
-      color: #f0b429;
+      color: var(--warn);
     }
 
     .cell-lint-state.bad {
       color: var(--danger);
     }
 
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 0 2rem;
-      color: var(--text-faint);
-      font-size: 0.82rem;
-    }
-
-    .foot-inner {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem 2rem;
-      justify-content: space-between;
-    }
-
-    footer a {
-      color: var(--text-dim);
-    }
   </style>
 </head>
 
@@ -498,7 +255,9 @@
       <div class="nav-links">
         <a href="./">Releases</a>
         <a class="active" href="./lcca-notebook.html">Notebook</a>
+        <a href="./view_documentation.html">Docs</a>
         <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">🌓</button>
       </div>
     </div>
   </nav>
