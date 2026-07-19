@@ -18,11 +18,6 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-# Everything under release/ is ephemeral local staging (see DEVELOPING.md)
-# except releases.json, the committed ledger -- /release/* + a negation
-# (not /release/) so git still descends into the directory to find it.
-/release/*
-!/release/releases.json
 downloads/
 eggs/
 .eggs/
