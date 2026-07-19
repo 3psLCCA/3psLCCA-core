@@ -8,9 +8,10 @@ For each entry in "versions": if dist/<filename> exists, its sha256 is
 recomputed and compared to wheel_sha256; if release-kind and path/release/
 vX.Y.Z/ exists, the staged wheel and 3pslccacore.js copies are checked the
 same way against wheel_sha256/js_sha256. Files that aren't present locally
-are skipped, not flagged -- dist/ and release/ are both gitignored and safe
-to delete anytime (see DEVELOPING.md), so a missing file just means there's
-nothing to check for it, not that something is wrong.
+are skipped, not flagged -- dist/ and staged release/vX.Y.Z/ folders are
+disposable local build output, safe to delete anytime (see DEVELOPER.md),
+so a missing file just means there's nothing to check for it, not that
+something is wrong.
 
 Usage:
 

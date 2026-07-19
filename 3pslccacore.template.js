@@ -14,10 +14,11 @@
   // with that release's *fully-qualified* wheel URL (its github.io Pages
   // origin, computed from `git remote get-url origin`, + release/vX.Y.Z/ +
   // filename), and stage the result alongside the wheel itself in
-  // release/vX.Y.Z/ (gitignored, local only). release.py then copies that
-  // already-assembled folder onto the web branch (the one GitHub Pages
-  // serves; development happens on web-dev instead, see DEVELOPING.md) --
-  // it doesn't render this file itself.
+  // release/vX.Y.Z/ (local staging only, never committed on web-dev).
+  // release.py then bundles that already-assembled folder into
+  // release/_publish/, whose contents are copied manually onto the web
+  // branch (the one GitHub Pages serves; development happens on web-dev
+  // instead, see DEVELOPER.md) -- it doesn't render this file itself.
   //
   // RELEASE_WHEEL_URL is deliberately baked in as an absolute URL rather
   // than a path resolved at runtime against document.currentScript.src:
@@ -39,6 +40,10 @@
 
   let pyodidePromise = null;
   let activeWheelUrl = null;
+  // Monotonic id of the latest init attempt. A superseded attempt (a newer
+  // init started with a different wheel URL while it was in flight) keeps
+  // running, but must no longer write to the shared `state` below.
+  let initAttempt = 0;
 
   // Tracks how far initialization got, so callers can tell exactly what is
   // (or isn't) installed. `stage` is one of: idle, checking-environment,
@@ -93,11 +98,70 @@
     return makeError(stage, message);
   }
 
+  // User-facing copy for "we need the network and don't have it" failures,
+  // kept in one place so every offline-shaped error reads the same way.
+  const OFFLINE_MESSAGE =
+    "You're offline. Running an analysis the first time needs to download " +
+    "some files (the Python runtime and the analysis package) — please " +
+    "reconnect to the internet and try again.";
+
+  // Init error variant for offline/network failures: same bookkeeping as
+  // fail(), but tags the error as `.isOffline = true` and swaps in
+  // OFFLINE_MESSAGE so callers can show a friendly banner instead of a raw
+  // fetch/network exception. `detail` (the original error/string) is kept
+  // on the error for logging, just not shown to the user.
+  function failOffline(stage, detail) {
+    state.stage = "error";
+    state.error = { stage, message: OFFLINE_MESSAGE, detail: String(detail) };
+    const err = makeError(stage, OFFLINE_MESSAGE);
+    err.isOffline = true;
+    err.detail = String(detail);
+    return err;
+  }
+
+  // Best-effort check for "we clearly have no network". `navigator.onLine`
+  // can false-positive (true even on a flaky/captive-portal connection) but
+  // it reliably catches the common case of being fully offline, so it's
+  // useful as a fast pre-check before even attempting a fetch.
+  function isOffline() {
+    return typeof navigator !== "undefined" && navigator.onLine === false;
+  }
+
+  // Network-shaped errors from fetch()/Pyodide/micropip don't carry a
+  // consistent type across browsers, so this matches on the common
+  // messages/names instead of relying on `instanceof`.
+  function looksLikeNetworkError(e) {
+    if (isOffline()) return true;
+    const msg = String((e && e.message) || e || "").toLowerCase();
+    return (
+      msg.includes("failed to fetch") ||
+      msg.includes("networkerror") ||
+      msg.includes("network error") ||
+      msg.includes("load failed") ||
+      msg.includes("err_internet_disconnected") ||
+      msg.includes("err_network_changed") ||
+      msg.includes("err_connection")
+    );
+  }
+
   // Pre-flight checks that don't need Pyodide running yet. Returns a list of
   // human-readable problems; empty list means the environment looks usable.
   async function checkEnvironment(customWheelUrl) {
     const problems = [];
     const wheelUrl = customWheelUrl || WHEEL_URL;
+
+    if (isOffline()) {
+      problems.push(OFFLINE_MESSAGE);
+      return problems;
+    }
+
+    if (!wheelUrl) {
+      problems.push(
+        "No wheel URL configured: this copy is the un-rendered template with " +
+          "no baked-in URL. Pass the wheel's URL via the `wheelUrl` option, " +
+          "or use a release build of 3pslccacore.js."
+      );
+    }
 
     if (typeof global.loadPyodide !== "function") {
       problems.push(
@@ -119,20 +183,26 @@
     }
 
     // Confirm the wheel is actually reachable before handing it to micropip,
-    // which reports missing files with a much less obvious error.
-    if (global.location && global.location.protocol !== "file:") {
+    // which reports missing files with a much less obvious error. (An empty
+    // wheelUrl must skip this: fetch("") resolves against the page's own URL
+    // and would falsely pass.)
+    if (wheelUrl && global.location && global.location.protocol !== "file:") {
       try {
         const resp = await fetch(wheelUrl, { method: "HEAD" });
         if (!resp.ok) {
           problems.push(
             `Wheel not found at ${wheelUrl} (HTTP ${resp.status}). ` +
               "Build a release (`python -m build --wheel -C version=X.Y.Z -C release=true`, " +
-              "see DEVELOPING.md) so it's colocated with this script, or pass the wheel's " +
+              "see DEVELOPER.md) so it's colocated with this script, or pass the wheel's " +
               "URL explicitly via the `wheelUrl` option."
           );
         }
       } catch (e) {
-        problems.push(`Could not reach wheel at ${wheelUrl}: ${e}`);
+        if (looksLikeNetworkError(e)) {
+          problems.push(OFFLINE_MESSAGE);
+        } else {
+          problems.push(`Could not reach wheel at ${wheelUrl}: ${e}`);
+        }
       }
     }
 
@@ -141,69 +211,123 @@
 
   // Idempotent: repeated calls return the same in-flight/settled promise.
   // Rejects with an Error carrying a `.stage` property naming the failed step.
+  //
+  // - Omitting `customWheelUrl` reuses the URL of the current/previous
+  //   attempt (falling back to the baked-in WHEEL_URL), so a follow-up call
+  //   without options doesn't tear down a runtime that was initialized with
+  //   an explicit wheelUrl.
+  // - A failed attempt is not cached: the next call starts over, so
+  //   "reconnect and try again" actually works.
+  // - Passing a *different* wheel URL starts a fresh attempt; a superseded
+  //   in-flight attempt keeps running but stops touching `state`.
+  // - Progress notifications only reach the `onStatus` of the call that
+  //   started the attempt; later callers joining an in-flight init share
+  //   its promise but get no status callbacks.
   function init(onStatus, customWheelUrl) {
     const notify = onStatus || (() => {});
-    const wheelUrl = customWheelUrl || WHEEL_URL;
+    const wheelUrl = customWheelUrl || activeWheelUrl || WHEEL_URL;
     if (pyodidePromise && activeWheelUrl !== wheelUrl) {
       pyodidePromise = null;
     }
     if (!pyodidePromise) {
+      if (!wheelUrl) {
+        return Promise.reject(
+          fail(
+            "checking-environment",
+            "No wheel URL configured: this copy is the un-rendered template " +
+              "with no baked-in URL. Pass the wheel's URL via the `wheelUrl` " +
+              "option, or use a release build of 3pslccacore.js."
+          )
+        );
+      }
       activeWheelUrl = wheelUrl;
-      pyodidePromise = (async () => {
-        state.stage = "checking-environment";
-        notify("Checking environment...");
+      const attemptId = ++initAttempt;
+      const current = () => attemptId === initAttempt;
+      // These write to the shared `state` (and fire onStatus) only while
+      // this attempt is still the latest one, so a superseded attempt can't
+      // clobber the progress of the attempt that replaced it.
+      const setStage = (stage, message) => {
+        if (current()) {
+          state.stage = stage;
+          notify(message);
+        }
+      };
+      const stageFail = (stage, message) =>
+        current() ? fail(stage, message) : makeError(stage, message);
+      const stageFailOffline = (stage, detail) => {
+        if (current()) return failOffline(stage, detail);
+        const err = makeError(stage, OFFLINE_MESSAGE);
+        err.isOffline = true;
+        err.detail = String(detail);
+        return err;
+      };
+
+      const attempt = (async () => {
+        setStage("checking-environment", "Checking environment...");
         const problems = await checkEnvironment(wheelUrl);
         if (problems.length > 0) {
-          throw fail("checking-environment", problems.join(" | "));
+          throw stageFail("checking-environment", problems.join(" | "));
         }
 
-        state.stage = "booting-pyodide";
-        notify("Booting Pyodide runtime...");
+        setStage("booting-pyodide", "Booting Pyodide runtime...");
         let pyodide;
         try {
           pyodide = await global.loadPyodide();
         } catch (e) {
-          throw fail("booting-pyodide", "Pyodide failed to start: " + e);
+          throw looksLikeNetworkError(e)
+            ? stageFailOffline("booting-pyodide", e)
+            : stageFail("booting-pyodide", "Pyodide failed to start: " + e);
         }
-        state.pyodideVersion = pyodide.version;
+        if (current()) state.pyodideVersion = pyodide.version;
 
-        state.stage = "loading-micropip";
-        notify("Loading micropip...");
+        setStage("loading-micropip", "Loading micropip...");
         try {
           await pyodide.loadPackage("micropip");
         } catch (e) {
-          throw fail("loading-micropip", "Failed to load micropip (network/CDN issue?): " + e);
+          throw looksLikeNetworkError(e)
+            ? stageFailOffline("loading-micropip", e)
+            : stageFail("loading-micropip", "Failed to load micropip (network/CDN issue?): " + e);
         }
 
-        state.stage = "installing-wheel";
-        notify(`Installing ${PACKAGE_NAME} from local wheel...`);
+        setStage("installing-wheel", `Installing ${PACKAGE_NAME} from local wheel...`);
         const micropip = pyodide.pyimport("micropip");
         try {
           // Path is resolved relative to the page's URL.
           await micropip.install(wheelUrl);
         } catch (e) {
-          throw fail("installing-wheel", `micropip failed to install ${wheelUrl}: ` + e);
+          throw looksLikeNetworkError(e)
+            ? stageFailOffline("installing-wheel", e)
+            : stageFail("installing-wheel", `micropip failed to install ${wheelUrl}: ` + e);
         }
 
-        state.stage = "verifying-package";
-        notify(`Verifying ${PACKAGE_NAME} import...`);
+        setStage("verifying-package", `Verifying ${PACKAGE_NAME} import...`);
+        let packageVersion;
         try {
-          state.packageVersion = await pyodide.runPythonAsync(`
+          packageVersion = await pyodide.runPythonAsync(`
 from importlib.metadata import version
 import ${PACKAGE_NAME}.core.main  # noqa: F401 — proves the analysis entry point imports
 version("${PACKAGE_NAME.replace(/_/g, "-")}")
           `);
         } catch (e) {
-          throw fail(
+          throw stageFail(
             "verifying-package",
             `${PACKAGE_NAME} installed but failed to import (broken wheel or missing dependency?): ` + e
           );
         }
+        if (current()) state.packageVersion = packageVersion;
 
-        state.stage = "ready";
-        notify("Ready.");
+        setStage("ready", "Ready.");
         return pyodide;
       })();
+
+      pyodidePromise = attempt;
+      // Drop a failed attempt from the cache (unless a newer attempt has
+      // already replaced it) so the next init() retries from scratch.
+      attempt.catch(() => {
+        if (pyodidePromise === attempt) {
+          pyodidePromise = null;
+        }
+      });
     }
     return pyodidePromise;
   }
@@ -237,7 +361,12 @@ version("${PACKAGE_NAME.replace(/_/g, "-")}")
       throw makeError(stage, "Python execution failed: " + e);
     }
 
-    const payload = JSON.parse(payloadJson);
+    let payload;
+    try {
+      payload = JSON.parse(payloadJson);
+    } catch (e) {
+      throw makeError(stage, "Python returned a malformed JSON payload: " + e);
+    }
 
     const emit = onOutput || ((text, kind) => {
       (kind === "stderr" ? console.warn : console.log)(`[ThreePsLccaCore] python ${kind}:\n${text}`);
@@ -275,7 +404,10 @@ def _guarded(fn):
     payload["stdout"] = out.getvalue()
     payload["stderr"] = err.getvalue()
     try:
-        return json.dumps(payload)
+        # allow_nan=False: Python's json would happily emit NaN/Infinity,
+        # which aren't valid JSON and would make JSON.parse throw on the JS
+        # side; force such results down the structured-error path instead.
+        return json.dumps(payload, allow_nan=False)
     except (TypeError, ValueError) as e:
         return json.dumps({
             "ok": False,
@@ -505,5 +637,6 @@ _guarded(get_IRC_standard_suggestions)
     checkEnvironment,
     getState,
     isReady,
+    isOffline,
   };
 })(window);

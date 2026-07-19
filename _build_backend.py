@@ -49,11 +49,13 @@ attached terminal) always refuse rather than block.
 A confirmed *final* release build (release=true on a non-pre-release
 version) additionally stages release/vX.Y.Z/ locally: a copy of the wheel,
 its .sha256, and 3pslccacore.js rendered from 3pslccacore.template.js (the
-repo-root template) with RELEASE_WHEEL_URL filled in. release/ is
-gitignored, same as dist/ -- it's a local staging area, not the publish
-step. release.py picks up this already-assembled folder and copies it into
-the web branch (the one GitHub Pages serves; development happens on
-web-dev instead); it no longer renders 3pslccacore.js itself. On an
+repo-root template) with RELEASE_WHEEL_URL filled in. Staged
+release/vX.Y.Z/ folders are disposable local output, never committed on
+web-dev (only release/releases.json is) -- a staging area, not the publish
+step. release.py picks up this already-assembled folder and bundles it
+into release/_publish/, whose contents are then copied manually onto the
+web branch (the one GitHub Pages serves; development happens on web-dev
+instead); it no longer renders 3pslccacore.js itself. On an
 interactive terminal you're also asked whether to add a
 NOTES.md -- an empty scaffold file is created (content is hand-edited
 afterward, not collected here), and the entry's "notes" field is set true
@@ -68,9 +70,10 @@ origin than the release. releases.json's release-kind entries record
 that same computed URL, plus the sha256 of *both* staged files (wheel_sha256
 and js_sha256) -- enough for an HTML page to link/verify a release without
 recomputing anything. Every entry also starts with "published": false;
-release.py flips it to true on the local copy after an actual --push, so
-index.html (via release.py, which only ever publishes published-or-current
-entries) never links to a version that isn't really there.
+you flip it to true by hand after actually pushing the release to the web
+branch, so index.html (via release.py, which only ever publishes
+published-or-current entries) never links to a version that isn't really
+there.
 """
 
 import datetime
@@ -275,7 +278,7 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
         "js_sha256": js_sha256,
         "notes": notes,
         "commit": _git_commit(),
-        # Set True only by release.py, after it actually pushes this version
+        # Flipped to True by hand only after this version is actually pushed
         # to the web branch -- staging/recording here means "built", not
         # "published".
         "published": False,

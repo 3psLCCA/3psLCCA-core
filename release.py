@@ -10,7 +10,7 @@ This script does *not* touch git at all -- no clone, no commit, no push.
 It just validates the version, finds the already-staged release/vX.Y.Z/
 files (wheel, .sha256, 3pslccacore.js, optional NOTES.md -- built by
 `python -m build --wheel -C version=X.Y.Z -C release=true`, see
-DEVELOPING.md), and assembles everything the web branch's root needs --
+DEVELOPER.md), and assembles everything the web branch's root needs --
 index.html, a filtered release/releases.json (only entries already marked
 "published": true in the local ledger, plus the one being built now -- so
 the published page never links to a version that only ever existed
@@ -68,7 +68,7 @@ def validate_version(raw):
     if version.is_prerelease:
         fail(
             f"--version '{raw}' is a pre-release. Releasing only ships final versions "
-            "-- build with -C release=true first (see DEVELOPING.md)."
+            "-- build with -C release=true first (see DEVELOPER.md)."
         )
     return version
 
@@ -104,7 +104,7 @@ def find_staged_release(version):
 
 def load_local_releases():
     if not RELEASES_FILE.is_file():
-        fail(f"{RELEASES_FILE.relative_to(ROOT)} not found. Build a release first (see DEVELOPING.md).")
+        fail(f"{RELEASES_FILE.relative_to(ROOT)} not found. Build a release first (see DEVELOPER.md).")
     try:
         data = json.loads(RELEASES_FILE.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
