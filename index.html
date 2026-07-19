@@ -305,6 +305,10 @@
       </div>
       <pre id="latestSnippet" hidden><code></code></pre>
     </div>
+    <p class="muted" id="snippetNote" hidden>
+      Quick start, options, and integrity hashes are in this release's
+      <a href="#">Notes</a> — worth a read before embedding.
+    </p>
 
     <h2>All releases</h2>
     <div class="table-card">
@@ -467,10 +471,14 @@
           const integrityAttr = latestEntry.js_sha256
             ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
             : "";
-          const pyodideUrl = latestEntry.pyodide_url || "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
           snippetEl.querySelector("code").textContent =
-            `<script src="${pyodideUrl}"><\/script>
-<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+            `<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+          if (latestEntry.notes && latestEntry.path) {
+            const note = document.getElementById("snippetNote");
+            note.hidden = false;
+            note.querySelector("a").href =
+              `./view_documentation.html#file=${encodeURIComponent(`${latestEntry.path}/NOTES.md`)}`;
+          }
         } else if (data.latest) {
           statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;
           statusEl.className = "error";
