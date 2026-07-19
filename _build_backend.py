@@ -331,10 +331,12 @@ def _stage_release(wheel_directory, filename, parsed_version):
     path = f"release/v{parsed_version}"
     url = f"{base_url}/{path}"
     js_path = release_dir / "3pslccacore.js"
-    js_path.write_text(_render_release_js(f"{url}/{filename}"), encoding="utf-8")
-    # Hash what's actually on disk, not the in-memory string -- write_text's
-    # newline translation (e.g. \n -> \r\n on Windows) means the two can
-    # differ, and js_sha256 must match the real staged file's bytes.
+    # newline="\n" pins the on-disk bytes to LF regardless of platform --
+    # without it, write_text translates \n -> \r\n on Windows, and git (which
+    # normalizes text files to LF) stores/serves different bytes than what
+    # got hashed below, so js_sha256 would match the local file but not the
+    # one GitHub Pages actually serves.
+    js_path.write_text(_render_release_js(f"{url}/{filename}"), encoding="utf-8", newline="\n")
     js_sha256 = _sha256_file(js_path)
 
     notes = _prompt_notes(parsed_version)
