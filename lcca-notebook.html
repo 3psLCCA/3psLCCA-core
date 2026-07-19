@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3psLCCA-core — JS Notebook</title>
+  <meta name="description"
+    content="An editable JavaScript notebook for 3pslccacore.js — tweak the inputs, run each cell, and watch the LCCA output change." />
+  <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"
+    integrity="sha256-qgawHfOZqxF/QEf+rp7SEecZMYlOrdnP/zcY0qVXM68=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jshint@2.13.6/dist/jshint.js"></script>
+  <style>
+    :root {
+      --bg: #0a0b10;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-2: rgba(255, 255, 255, 0.055);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #e7e9ee;
+      --text-dim: #9aa1b2;
+      --text-faint: #626a7d;
+      --accent: #7c8cff;
+      --accent-2: #4dd6c1;
+      --danger: #ff6b7a;
+      --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(50rem 30rem at 80% -10%, rgba(124, 140, 255, 0.13), transparent 60%),
+        radial-gradient(40rem 26rem at 5% 10%, rgba(77, 214, 193, 0.07), transparent 60%);
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.86em;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.1em 0.4em;
+      border-radius: 6px;
+    }
+
+    .wrap {
+      max-width: 60rem;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10, 11, 16, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      height: 3.5rem;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand:hover {
+      text-decoration: none;
+    }
+
+    .brand .logo {
+      width: 1.7rem;
+      height: 1.7rem;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .nav-links {
+      margin-left: auto;
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: var(--surface-2);
+      text-decoration: none;
+    }
+
+    .nav-links a.active {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    @media (max-width: 40rem) {
+      .wrap {
+        padding: 0 0.9rem;
+      }
+
+      .nav-inner {
+        gap: 0.6rem;
+      }
+
+      .nav-links a {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.45rem;
+      }
+
+      .brand {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (max-width: 26rem) {
+      .brand-text {
+        display: none;
+      }
+    }
+
+    .statusbar {
+      position: sticky;
+      top: 3.5rem;
+      z-index: 40;
+      background: rgba(10, 11, 16, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0;
+    }
+
+    .status-dot {
+      flex: 0 0 auto;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 8px var(--accent-2);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    #status {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 550;
+      font-family: var(--mono);
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .runall {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.25rem 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .runall:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .runall:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .clearall {
+      margin-left: 0;
+    }
+
+    .clearall:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    header {
+      padding: 3.5rem 0 2rem;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin: 0 0 0.75rem;
+    }
+
+    h1 {
+      margin: 0 0 0.9rem;
+      font-size: clamp(2rem, 5vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      background: linear-gradient(90deg, #fff 30%, #9aa8ff 75%, var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .lead {
+      color: var(--text-dim);
+      font-size: 1.02rem;
+      max-width: 44rem;
+      margin: 0;
+    }
+
+    .lead kbd {
+      font-family: var(--mono);
+      font-size: 0.8em;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      padding: 0.05em 0.4em;
+    }
+
+    main {
+      padding: 1rem 0 4rem;
+    }
+
+    .cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 1.1rem;
+      overflow: hidden;
+      transition: border-color 0.2s ease;
+    }
+
+    .cell:focus-within {
+      border-color: var(--border-strong);
+    }
+
+    .cell-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.8rem;
+      padding: 0.7rem 1rem 0;
+    }
+
+    .cell-idx {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .cell-title {
+      font-weight: 650;
+      font-size: 0.95rem;
+      letter-spacing: -0.01em;
+    }
+
+    .cell-desc {
+      color: var(--text-dim);
+      font-size: 0.84rem;
+      margin: 0.15rem 1rem 0.6rem;
+      padding-left: 2.1rem;
+    }
+
+    .cell-code {
+      display: block;
+      width: 100%;
+      background: #07080c;
+      color: #b8c1d9;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      border: none;
+      border-top: 1px solid var(--border);
+      padding: 0.85rem 1rem;
+      resize: vertical;
+      min-height: 3rem;
+      outline: none;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .cell-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .cell-run {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #5865f2, #7c8cff);
+      border: none;
+      border-radius: 8px;
+      padding: 0.35rem 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .cell-run:hover:not(:disabled) {
+      box-shadow: 0 4px 14px rgba(88, 101, 242, 0.45);
+    }
+
+    .cell-run:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .cell-state {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-faint);
+    }
+
+    .cell-state.ok {
+      color: var(--accent-2);
+    }
+
+    .cell-state.err {
+      color: var(--danger);
+    }
+
+    .cell-out {
+      margin: 0;
+      border-top: 1px solid var(--border);
+      background: #07080c;
+      color: #b8c1d9;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      padding: 0.85rem 1rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 20rem;
+      overflow: auto;
+    }
+
+    .cell-out:empty {
+      display: none;
+    }
+
+    .cell-out .err-line {
+      color: var(--danger);
+    }
+
+    .cell-lint {
+      border-top: 1px solid var(--border);
+      background: rgba(240, 180, 41, 0.06);
+      padding: 0.45rem 1rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.5;
+      color: #f0b429;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .cell-lint:empty {
+      display: none;
+    }
+
+    .cell-lint.lint-has-error {
+      background: rgba(220, 60, 60, 0.08);
+      color: var(--danger);
+    }
+
+    .cell-lint .lint-err {
+      color: var(--danger);
+    }
+
+    .cell-lint .lint-warn {
+      color: #f0b429;
+    }
+
+    .cell-lint-state {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      margin-left: auto;
+    }
+
+    .cell-lint-state.ok {
+      color: var(--text-faint);
+    }
+
+    .cell-lint-state.warn {
+      color: #f0b429;
+    }
+
+    .cell-lint-state.bad {
+      color: var(--danger);
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 0 2rem;
+      color: var(--text-faint);
+      font-size: 0.82rem;
+    }
+
+    .foot-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 2rem;
+      justify-content: space-between;
+    }
+
+    footer a {
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img class="logo" src="./assets/logo-3psLCCA.svg" alt="3psLCCA logo" /><span
+          class="brand-text">3psLCCA Core</span></a>
+      <div class="nav-links">
+        <a href="./">Releases</a>
+        <a class="active" href="./lcca-notebook.html">Notebook</a>
+        <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="statusbar">
+    <div class="wrap status-inner">
+      <span class="status-dot"></span>
+      <p id="status">Not initialized. <span id="stageLabel" style="color:var(--text-faint);font-weight:400"></span></p>
+      <button id="btnRunAll" class="runall" type="button">▶ run all</button>
+      <button id="btnClearAll" class="runall clearall" type="button">✕ clear all</button>
+    </div>
+  </div>
+
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Editable playground</p>
+      <h1>JS notebook</h1>
+      <p class="lead">
+        Each cell below is real, editable JavaScript running against <code>3pslccacore.js</code>.
+        Change anything — especially the inputs in cell 04 — then press <kbd>Shift</kbd>+<kbd>Enter</kbd>
+        (or the run button) to execute a cell. Cells share state through the <code>nb</code> object,
+        and <code>display(value)</code> prints into the cell's output.
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap" id="cells"></main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <span>3psLCCA Core · in-browser Life-Cycle Cost Analysis</span>
+      <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web">github.com/3psLCCA/3psLCCA-core</a>
+    </div>
+  </footer>
+
+  <script>
+    const api = window.ThreePsLccaCore;
+    const { getState } = api;
+
+    function setStatus(text) {
+      document.getElementById("status").firstChild.textContent = text + " ";
+      document.getElementById("stageLabel").textContent = `(stage: ${getState().stage})`;
+    }
+
+    // ---- notebook cells (title, description, editable source) ----
+    const CELLS = [
+      {
+        title: "Check the environment",
+        desc: "No input needed — verifies WebAssembly and that the release wheel is reachable, without booting Python.",
+        code: `const problems = await checkEnvironment();
+display(problems.length ? problems : "No problems detected — environment looks usable.");`,
+      },
+      {
+        title: "Initialize the Python runtime",
+        desc: "Downloads Pyodide + the bundled wheel and boots Python. Takes a moment on first run; watch the status bar.",
+        code: `await init((msg) => setStatus(msg));
+setStatus("Ready ✔");
+display(getState());`,
+      },
+      {
+        title: "IRC standard suggestions",
+        desc: "Maintenance-strategy suggestions per the IRC standard, straight from the Python core.",
+        code: `const suggestions = await getIrcStandardSuggestions({
+  onStatus: (m) => setStatus(m),
+});
+display(suggestions);`,
+      },
+      {
+        title: "Prepare your input — edit me!",
+        desc: "Clones the bundled sample input so you can tweak values. Change the numbers, re-run this cell, then re-run cell 05 and compare outputs.",
+        code: `// arg 1 — the analysis input (cloned so the original sample stays intact)
+nb.input = structuredClone(sample.input);
+
+// try changing these ↓
+nb.input.general_parameters.discount_rate_percent = 6.7;
+nb.input.general_parameters.analysis_period_years = 100;
+nb.input.traffic_and_road_data.vehicle_data.small_cars.vehicles_per_day = 7271;
+
+// args 2 & 3 — construction costs and WPI escalation factors
+nb.constructionCosts = structuredClone(sample.constructionCosts);
+nb.wpi = structuredClone(sample.wpi);
+
+display({
+  general_parameters: nb.input.general_parameters,
+  constructionCosts: nb.constructionCosts,
+});`,
+      },
+      {
+        title: "Run the full LCCA",
+        desc: "performAnalysis(input, constructionCosts, wpi) with whatever you prepared in cell 04.",
+        code: `const result = await performAnalysis(nb.input, nb.constructionCosts, nb.wpi, {
+  onStatus: (m) => setStatus(m),
+});
+nb.result = result;
+display(result);`,
+      },
+      {
+        title: "Global RUC mode",
+        desc: "Same call, but arg 1 replaces per-vehicle traffic data with one precomputed daily road-user-cost total (use_global_road_user_calculations: true). Args 2 & 3 stay the same.",
+        code: `nb.inputGlobal = structuredClone(sample.inputGlobal);
+
+// the single precomputed total that replaces all per-vehicle traffic data:
+display(nb.inputGlobal.daily_road_user_cost_with_vehicular_emissions);
+
+const resultGlobal = await performAnalysis(nb.inputGlobal, nb.constructionCosts, nb.wpi, {
+  onStatus: (m) => setStatus(m),
+});
+nb.resultGlobal = resultGlobal;
+display(resultGlobal);`,
+      },
+      {
+        title: "Error handling",
+        desc: "Bad input raises LccaError with structured fields: .stage, .pythonType, .traceback, .stdout, .stderr.",
+        code: `try {
+  await performAnalysis({}, {}, {});
+  display("(unexpectedly succeeded)");
+} catch (e) {
+  if (e instanceof LccaError) {
+    display({
+      stage: e.stage,
+      pythonType: e.pythonType,
+      message: e.message,
+      traceback_tail: e.traceback ? e.traceback.split("\\n").slice(-5) : [],
+    });
+  } else {
+    display("Non-LccaError thrown: " + String(e));
+  }
+}`,
+      },
+    ];
+
+    // ---- build the notebook UI ----
+    const nb = {}; // shared state between cells
+    const cellsRoot = document.getElementById("cells");
+    const cellEls = [];
+
+    CELLS.forEach((cell, i) => {
+      const idx = String(i + 1).padStart(2, "0");
+      const el = document.createElement("section");
+      el.className = "cell";
+      el.innerHTML = `
+    <div class="cell-head">
+      <span class="cell-idx">[${idx}]</span>
+      <span class="cell-title"></span>
+    </div>
+    <p class="cell-desc"></p>
+    <textarea class="cell-code" spellcheck="false"></textarea>
+    <div class="cell-lint"></div>
+    <div class="cell-bar">
+      <button class="cell-run" type="button">▶ run</button>
+      <span class="cell-state"></span>
+      <span class="cell-lint-state"></span>
+    </div>
+    <pre class="cell-out"></pre>`;
+      el.querySelector(".cell-title").textContent = cell.title;
+      el.querySelector(".cell-desc").textContent = cell.desc;
+      const ta = el.querySelector(".cell-code");
+      ta.value = cell.code;
+      cellsRoot.appendChild(el);
+      autosize(ta);
+      let lintTimer;
+      ta.addEventListener("input", () => {
+        autosize(ta);
+        clearTimeout(lintTimer);
+        lintTimer = setTimeout(() => lintCell(i), 400);
+      });
+      ta.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && ev.shiftKey) { ev.preventDefault(); runCell(i); }
+        if (ev.key === "Tab") {
+          ev.preventDefault();
+          const s = ta.selectionStart;
+          ta.setRangeText("  ", s, ta.selectionEnd, "end");
+        }
+      });
+      el.querySelector(".cell-run").addEventListener("click", () => runCell(i));
+      cellEls.push(el);
+    });
+
+    function autosize(ta) {
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight + 2, 480) + "px";
+    }
+
+    // ---- linting (JSHint from CDN; falls back to a plain syntax check) ----
+    // Cells run inside an async wrapper, so lint the same wrapped source and
+    // shift reported line numbers back by the one wrapper line.
+    const LINT_GLOBALS = {};
+    ["api", "nb", "display", "setStatus", "checkEnvironment", "init", "getState",
+      "isReady", "performAnalysis", "getIrcStandardSuggestions", "sample",
+      "LccaError", "structuredClone"].forEach((g) => { LINT_GLOBALS[g] = false; });
+
+    function lintCell(i) {
+      const el = cellEls[i];
+      const lintEl = el.querySelector(".cell-lint");
+      const stateEl = el.querySelector(".cell-lint-state");
+      const wrapped = `(async () => {\n${el.querySelector(".cell-code").value}\n})();`;
+      const issues = [];
+
+      if (window.JSHINT) {
+        JSHINT(wrapped, {
+          esversion: 11, undef: true, browser: true, devel: true,
+          asi: true, expr: true, globals: LINT_GLOBALS,
+        });
+        for (const e of JSHINT.errors || []) {
+          if (!e) continue;
+          issues.push({
+            line: e.line - 1,
+            msg: e.reason,
+            isError: !!(e.code && e.code.startsWith("E")),
+          });
+        }
+      } else {
+        try {
+          new Function(wrapped);
+        } catch (e) {
+          issues.push({ line: null, msg: String(e), isError: true });
+        }
+      }
+
+      lintEl.textContent = "";
+      for (const iss of issues.slice(0, 5)) {
+        const d = document.createElement("div");
+        d.className = iss.isError ? "lint-err" : "lint-warn";
+        d.textContent = (iss.line ? `L${iss.line}: ` : "") + iss.msg;
+        lintEl.appendChild(d);
+      }
+      if (issues.length > 5) {
+        const d = document.createElement("div");
+        d.textContent = `…and ${issues.length - 5} more`;
+        lintEl.appendChild(d);
+      }
+
+      const errors = issues.filter((x) => x.isError).length;
+      lintEl.classList.toggle("lint-has-error", errors > 0);
+      if (errors) {
+        stateEl.className = "cell-lint-state bad";
+        stateEl.textContent = `✘ ${errors} error${errors > 1 ? "s" : ""}`;
+      } else if (issues.length) {
+        stateEl.className = "cell-lint-state warn";
+        stateEl.textContent = `⚠ ${issues.length} warning${issues.length > 1 ? "s" : ""}`;
+      } else {
+        stateEl.className = "cell-lint-state ok";
+        stateEl.textContent = "✓ lint";
+      }
+      return issues;
+    }
+
+    cellEls.forEach((_, i) => lintCell(i));
+
+    // ---- cell execution ----
+    async function runCell(i) {
+      const el = cellEls[i];
+      const runBtn = el.querySelector(".cell-run");
+      const stateEl = el.querySelector(".cell-state");
+      const outEl = el.querySelector(".cell-out");
+      outEl.textContent = "";
+
+      const display = (val) => {
+        const line = document.createElement("span");
+        line.textContent = (typeof val === "string" ? val : JSON.stringify(val, null, 2)) + "\n";
+        outEl.appendChild(line);
+      };
+
+      runBtn.disabled = true;
+      stateEl.className = "cell-state";
+      stateEl.textContent = "running…";
+      const t0 = performance.now();
+      try {
+        const fn = new Function(
+          "api", "nb", "display", "setStatus",
+          "checkEnvironment", "init", "getState", "isReady",
+          "performAnalysis", "getIrcStandardSuggestions", "sample", "LccaError",
+          `return (async () => {\n${el.querySelector(".cell-code").value}\n})();`
+        );
+        const value = await fn(
+          api, nb, display, setStatus,
+          api.checkEnvironment, api.init, api.getState, api.isReady,
+          api.performAnalysis, api.getIrcStandardSuggestions, api.sample, api.LccaError
+        );
+        if (value !== undefined) display(value);
+        stateEl.className = "cell-state ok";
+        stateEl.textContent = `done in ${((performance.now() - t0) / 1000).toFixed(2)}s`;
+        return true;
+      } catch (e) {
+        const line = document.createElement("span");
+        line.className = "err-line";
+        const detail = e instanceof api.LccaError ? JSON.stringify(e.toJSON(), null, 2) : String(e);
+        line.textContent = detail + "\n";
+        outEl.appendChild(line);
+        stateEl.className = "cell-state err";
+        stateEl.textContent = "error";
+        return false;
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    // ---- run all, top to bottom, stopping on the first error ----
+    // (skips the deliberate-error cell at the end so a clean run stays green)
+    document.getElementById("btnRunAll").onclick = async () => {
+      const btn = document.getElementById("btnRunAll");
+      btn.disabled = true;
+      try {
+        for (let i = 0; i < CELLS.length - 1; i++) {
+          cellEls[i].scrollIntoView({ behavior: "smooth", block: "center" });
+          const ok = await runCell(i);
+          if (!ok) break;
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    // ---- clear all outputs (leaves code edits and the runtime untouched) ----
+    document.getElementById("btnClearAll").onclick = () => {
+      cellEls.forEach((el) => {
+        el.querySelector(".cell-out").textContent = "";
+        const stateEl = el.querySelector(".cell-state");
+        stateEl.className = "cell-state";
+        stateEl.textContent = "";
+      });
+      for (const key of Object.keys(nb)) delete nb[key];
+    };
+  </script>
+</body>
+
+</html>

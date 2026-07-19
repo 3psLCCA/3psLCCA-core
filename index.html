@@ -1,185 +1,650 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8" />
-<title>3psLCCA Core — releases</title>
-<style>
-  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #1a1a1a; }
-  h1 { font-size: 1.4rem; }
-  h2 { font-size: 1.1rem; margin-top: 2rem; }
-  code, pre { font-family: ui-monospace, Consolas, monospace; }
-  code { background: #f5f5f5; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
-  pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 6px; }
-  table { border-collapse: collapse; width: 100%; margin-top: 0.75rem; font-size: 0.9rem; }
-  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
-  th { font-weight: 600; color: #555; }
-  tr.prerelease td { color: #888; }
-  .badge { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef; color: #335; }
-  .badge.latest { background: #dff0d8; color: #2a5; }
-  .badge.unpublished { background: #f5f0e0; color: #a70; }
-  .sha { color: #888; }
-  #status { color: #888; }
-  #status.error { color: #b00020; }
-</style>
-<script src="./release/v1.0.0/3pslccacore.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3psLCCA Core — Releases</title>
+  <meta name="description"
+    content="Published browser/Pyodide releases of 3pslccacore.js — the single script you need for in-browser LCCA." />
+  <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
+  <style>
+    :root {
+      --bg: #0a0b10;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-2: rgba(255, 255, 255, 0.055);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #e7e9ee;
+      --text-dim: #9aa1b2;
+      --text-faint: #626a7d;
+      --accent: #7c8cff;
+      --accent-2: #4dd6c1;
+      --danger: #ff6b7a;
+      --warn: #f0b429;
+      --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(50rem 30rem at 80% -10%, rgba(124, 140, 255, 0.13), transparent 60%),
+        radial-gradient(40rem 26rem at 5% 10%, rgba(77, 214, 193, 0.07), transparent 60%);
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.86em;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.1em 0.4em;
+      border-radius: 6px;
+    }
+
+    .wrap {
+      max-width: 60rem;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    /* ---- nav ---- */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10, 11, 16, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      height: 3.5rem;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand:hover {
+      text-decoration: none;
+    }
+
+    .brand .logo {
+      width: 1.7rem;
+      height: 1.7rem;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .nav-links {
+      margin-left: auto;
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: var(--surface-2);
+      text-decoration: none;
+    }
+
+    .nav-links a.active {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    @media (max-width: 40rem) {
+      .wrap {
+        padding: 0 0.9rem;
+      }
+
+      .nav-inner {
+        gap: 0.6rem;
+      }
+
+      .nav-links a {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.45rem;
+      }
+
+      .brand {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (max-width: 26rem) {
+      .brand-text {
+        display: none;
+      }
+    }
+
+    /* ---- hero ---- */
+    header {
+      padding: 4.5rem 0 3rem;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin: 0 0 0.75rem;
+    }
+
+    h1 {
+      margin: 0 0 0.9rem;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      background: linear-gradient(90deg, #fff 30%, #9aa8ff 75%, var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .lead {
+      color: var(--text-dim);
+      font-size: 1.06rem;
+      max-width: 42rem;
+      margin: 0 0 1.5rem;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--text-dim);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+    }
+
+    .chip::before {
+      content: "";
+      width: 0.4rem;
+      height: 0.4rem;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .chip:nth-child(2)::before {
+      background: var(--accent-2);
+    }
+
+    .chip:nth-child(3)::before {
+      background: var(--warn);
+    }
+
+    .chip:nth-child(4)::before {
+      background: #ff8ad8;
+    }
+
+    /* ---- sections ---- */
+    main {
+      padding-bottom: 4rem;
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+      margin: 2.5rem 0 0.9rem;
+    }
+
+    .muted {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      max-width: 46rem;
+    }
+
+    #status {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    #status.ok {
+      color: var(--accent-2);
+    }
+
+    #status.error {
+      color: var(--danger);
+    }
+
+    /* ---- snippet card ---- */
+    .snippet {
+      background: #07080c;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .snippet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.9rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-faint);
+    }
+
+    .snippet pre {
+      margin: 0;
+      padding: 1rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: #b8c1d9;
+      overflow-x: auto;
+    }
+
+    .copy-btn {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.25rem 0.7rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .copy-btn.done {
+      color: var(--accent-2);
+      border-color: var(--accent-2);
+    }
+
+    /* ---- releases table ---- */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.86rem;
+      min-width: 44rem;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.7rem 1rem;
+      vertical-align: top;
+    }
+
+    thead th {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: var(--surface-2);
+    }
+
+    tr.prerelease td {
+      color: var(--text-faint);
+    }
+
+    td code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-size: 0.85rem;
+    }
+
+    .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      font-weight: 600;
+      padding: 0.12rem 0.55rem;
+      border-radius: 999px;
+      margin-left: 0.5rem;
+      letter-spacing: 0.03em;
+    }
+
+    .tag.latest {
+      color: #0a0b10;
+      background: var(--accent-2);
+    }
+
+    .tag.pre {
+      color: var(--text-dim);
+      border: 1px solid var(--border-strong);
+    }
+
+    .tag.warn {
+      color: #0a0b10;
+      background: var(--warn);
+    }
+
+    .sha {
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      color: var(--text-faint);
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 0 2rem;
+      color: var(--text-faint);
+      font-size: 0.82rem;
+    }
+
+    .foot-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 2rem;
+      justify-content: space-between;
+    }
+
+    footer a {
+      color: var(--text-dim);
+    }
+  </style>
+  <script src="./release/v1.0.0/3pslccacore.js"></script>
 </head>
+
 <body>
 
-<h1>3psLCCA Core — releases</h1>
-<p>
-  This page reads <code>release/releases.json</code> and lists every
-  <code>3pslccacore.js</code> published for browser/Pyodide use -- that's
-  the one file you need to <code>&lt;script src&gt;</code>; it already
-  points at its own matching wheel internally. See
-  <a href="https://github.com/3psLCCA/3psLCCA-core/blob/web/DEVELOPING.md">DEVELOPING.md</a>
-  on the <code>web</code> branch for how a release is built and published
-  (<code>_build_backend.py</code> stages it locally, <code>release.py</code>
-  publishes it here).
-</p>
+  <nav>
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img class="logo" src="./assets/logo-3psLCCA.svg" alt="3psLCCA logo" /><span
+          class="brand-text">3psLCCA Core</span></a>
+      <div class="nav-links">
+        <a class="active" href="./">Releases</a>
+        <a href="./lcca-notebook.html">Notebook</a>
+        <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
 
-<h2>Latest</h2>
-<p id="status">Loading release/releases.json…</p>
-<pre id="latestSnippet" hidden><code></code></pre>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Browser · Pyodide · WebAssembly</p>
+      <h1>3psLCCA Core releases</h1>
+      <p class="lead">
+        Life-cycle cost analysis for pavements, running entirely in the browser.
+        One <code>&lt;script src&gt;</code> is all you need — each published
+        <code>3pslccacore.js</code> already points at its own matching Python wheel.
+      </p>
+      <div class="chips">
+        <span class="chip" id="latestBadge">latest: …</span>
+        <span class="chip">Pyodide · WASM</span>
+        <span class="chip">wheel bundled</span>
+        <span class="chip">CDN only · no install</span>
+      </div>
+    </div>
+  </header>
 
-<h2>All releases</h2>
-<table id="table" hidden>
-  <thead>
-    <tr>
-      <th>Version</th>
-      <th>Date</th>
-      <th>Notes</th>
-      <th>3pslccacore.js</th>
-      <th>sha256</th>
-      <th>Commit</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <main class="wrap">
 
-<script>
-  const statusEl = document.getElementById("status");
-  const snippetEl = document.getElementById("latestSnippet");
-  const tableEl = document.getElementById("table");
-  const tbodyEl = tableEl.querySelector("tbody");
+    <h2>Latest release</h2>
+    <p id="status">Loading release/releases.json…</p>
 
-  function shortSha(sha) {
-    return sha ? sha.slice(0, 12) : "—";
-  }
+    <div class="snippet" id="snippetCard" hidden>
+      <div class="snippet-head">
+        <span>drop-in snippet</span>
+        <button id="copyBtn" class="copy-btn" type="button">copy</button>
+      </div>
+      <pre id="latestSnippet" hidden><code></code></pre>
+    </div>
 
-  // Subresource Integrity needs a base64 digest, not the hex sha256 stored
-  // in releases.json.
-  function hexToBase64(hex) {
-    const bytes = hex.match(/.{2}/g).map((b) => parseInt(b, 16));
-    return btoa(String.fromCharCode(...bytes));
-  }
+    <h2>All releases</h2>
+    <div class="table-card">
+      <table id="table" hidden>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Date</th>
+            <th>Notes</th>
+            <th>3pslccacore.js</th>
+            <th>sha256</th>
+            <th>Commit</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-  function formatDate(iso) {
-    if (!iso) return "—";
-    return iso.slice(0, 10);
-  }
+  </main>
 
-  function renderRow(entry, isLatest) {
-    const tr = document.createElement("tr");
-    if (entry.kind === "prerelease") tr.className = "prerelease";
+  <footer>
+    <div class="wrap foot-inner">
+      <span>3psLCCA Core · in-browser Life-Cycle Cost Analysis</span>
+      <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web">github.com/3psLCCA/3psLCCA-core</a>
+    </div>
+  </footer>
 
-    const versionCell = document.createElement("td");
-    versionCell.textContent = entry.version;
-    if (isLatest) {
-      const badge = document.createElement("span");
-      badge.className = "badge latest";
-      badge.textContent = "latest";
-      badge.style.marginLeft = "0.5rem";
-      versionCell.appendChild(badge);
-    } else if (entry.kind === "prerelease") {
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = "prerelease";
-      badge.style.marginLeft = "0.5rem";
-      versionCell.appendChild(badge);
-    }
-    tr.appendChild(versionCell);
+  <script>
+    const statusEl = document.getElementById("status");
+    const snippetEl = document.getElementById("latestSnippet");
+    const snippetCard = document.getElementById("snippetCard");
+    const tableEl = document.getElementById("table");
+    const tbodyEl = tableEl.querySelector("tbody");
+    const latestBadge = document.getElementById("latestBadge");
+    const copyBtn = document.getElementById("copyBtn");
 
-    const dateCell = document.createElement("td");
-    dateCell.textContent = formatDate(entry.timestamp);
-    tr.appendChild(dateCell);
-
-    const notesCell = document.createElement("td");
-    if (entry.notes && entry.url) {
-      const a = document.createElement("a");
-      a.href = `${entry.url}/NOTES.md`;
-      a.textContent = "Notes";
-      notesCell.appendChild(a);
-    } else {
-      notesCell.textContent = "—";
-    }
-    tr.appendChild(notesCell);
-
-    const scriptCell = document.createElement("td");
-    if (entry.url) {
-      const a = document.createElement("a");
-      a.href = `${entry.url}/3pslccacore.js`;
-      a.textContent = "3pslccacore.js";
-      scriptCell.appendChild(a);
-    } else {
-      scriptCell.textContent = "3pslccacore.js";
-      const badge = document.createElement("span");
-      badge.className = "badge unpublished";
-      badge.textContent = "not published";
-      badge.style.marginLeft = "0.5rem";
-      scriptCell.appendChild(badge);
-    }
-    tr.appendChild(scriptCell);
-
-    const shaCell = document.createElement("td");
-    shaCell.className = "sha";
-    shaCell.textContent = shortSha(entry.js_sha256);
-    tr.appendChild(shaCell);
-
-    const commitCell = document.createElement("td");
-    commitCell.className = "sha";
-    commitCell.textContent = shortSha(entry.commit);
-    tr.appendChild(commitCell);
-
-    return tr;
-  }
-
-  fetch("./release/releases.json")
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then((data) => {
-      const versions = data.versions || [];
-      if (versions.length === 0) {
-        statusEl.textContent = "Nothing has been published yet.";
-        return;
-      }
-
-      const latestEntry = versions.find((e) => e.version === data.latest);
-      if (latestEntry && latestEntry.url) {
-        statusEl.textContent = `v${latestEntry.version} — ${latestEntry.url}`;
-        snippetEl.hidden = false;
-        const integrityAttr = latestEntry.js_sha256
-          ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
-          : "";
-        snippetEl.querySelector("code").textContent =
-`<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script>
-<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
-      } else if (data.latest) {
-        statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;
-        statusEl.className = "error";
-      } else {
-        statusEl.textContent = "No release is marked latest yet.";
-      }
-
-      const sorted = [...versions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
-      for (const entry of sorted) {
-        tbodyEl.appendChild(renderRow(entry, entry.version === data.latest));
-      }
-      tableEl.hidden = false;
-    })
-    .catch((err) => {
-      statusEl.textContent = `Could not load release/releases.json (${err}).`;
-      statusEl.className = "error";
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(snippetEl.textContent).then(() => {
+        copyBtn.textContent = "copied ✓";
+        copyBtn.classList.add("done");
+        setTimeout(() => {
+          copyBtn.textContent = "copy";
+          copyBtn.classList.remove("done");
+        }, 1500);
+      });
     });
-</script>
+
+    function shortSha(sha) {
+      return sha ? sha.slice(0, 12) : "—";
+    }
+
+    // Subresource Integrity needs a base64 digest, not the hex sha256 stored
+    // in releases.json.
+    function hexToBase64(hex) {
+      const bytes = hex.match(/.{2}/g).map((b) => parseInt(b, 16));
+      return btoa(String.fromCharCode(...bytes));
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "—";
+      return iso.slice(0, 10);
+    }
+
+    function makeTag(text, cls) {
+      const tag = document.createElement("span");
+      tag.className = "tag " + cls;
+      tag.textContent = text;
+      return tag;
+    }
+
+    function renderRow(entry, isLatest) {
+      const tr = document.createElement("tr");
+      if (entry.kind === "prerelease") tr.className = "prerelease";
+
+      const versionCell = document.createElement("td");
+      const versionCode = document.createElement("code");
+      versionCode.textContent = entry.version;
+      versionCell.appendChild(versionCode);
+      if (isLatest) {
+        versionCell.appendChild(makeTag("latest", "latest"));
+      } else if (entry.kind === "prerelease") {
+        versionCell.appendChild(makeTag("prerelease", "pre"));
+      }
+      tr.appendChild(versionCell);
+
+      const dateCell = document.createElement("td");
+      dateCell.textContent = formatDate(entry.timestamp);
+      tr.appendChild(dateCell);
+
+      const notesCell = document.createElement("td");
+      if (entry.notes && entry.url) {
+        const a = document.createElement("a");
+        a.href = `${entry.url}/NOTES.md`;
+        a.textContent = "Notes";
+        notesCell.appendChild(a);
+      } else {
+        notesCell.textContent = "—";
+      }
+      tr.appendChild(notesCell);
+
+      const scriptCell = document.createElement("td");
+      if (entry.url) {
+        const a = document.createElement("a");
+        a.href = `${entry.url}/3pslccacore.js`;
+        a.textContent = "3pslccacore.js";
+        scriptCell.appendChild(a);
+      } else {
+        scriptCell.textContent = "3pslccacore.js";
+        scriptCell.appendChild(makeTag("not published", "warn"));
+      }
+      tr.appendChild(scriptCell);
+
+      const shaCell = document.createElement("td");
+      shaCell.className = "sha";
+      shaCell.textContent = shortSha(entry.js_sha256);
+      tr.appendChild(shaCell);
+
+      const commitCell = document.createElement("td");
+      commitCell.className = "sha";
+      commitCell.textContent = shortSha(entry.commit);
+      tr.appendChild(commitCell);
+
+      return tr;
+    }
+
+    fetch("./release/releases.json")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => {
+        const versions = data.versions || [];
+        if (versions.length === 0) {
+          statusEl.textContent = "Nothing has been published yet.";
+          return;
+        }
+
+        if (data.latest) {
+          latestBadge.textContent = `latest: v${data.latest}`;
+        } else {
+          latestBadge.hidden = true;
+        }
+
+        const latestEntry = versions.find((e) => e.version === data.latest);
+        if (latestEntry && latestEntry.url) {
+          statusEl.textContent = `v${latestEntry.version} — ${latestEntry.url}`;
+          statusEl.className = "ok";
+          snippetCard.hidden = false;
+          snippetEl.hidden = false;
+          const integrityAttr = latestEntry.js_sha256
+            ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
+            : "";
+          snippetEl.querySelector("code").textContent =
+            `<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script>
+<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+        } else if (data.latest) {
+          statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;
+          statusEl.className = "error";
+        } else {
+          statusEl.textContent = "No release is marked latest yet.";
+        }
+
+        const sorted = [...versions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+        for (const entry of sorted) {
+          tbodyEl.appendChild(renderRow(entry, entry.version === data.latest));
+        }
+        tableEl.hidden = false;
+      })
+      .catch((err) => {
+        statusEl.textContent = `Could not load release/releases.json (${err}).`;
+        statusEl.className = "error";
+      });
+  </script>
 
 </body>
+
 </html>
