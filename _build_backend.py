@@ -28,8 +28,8 @@ Any build made with -C release=true is also appended to releases.json's
 ledger of builds the user explicitly flagged as meaningful, independent of
 whether they were ever published via release.py. -C release=true is
 required to build a final version at all, but can also be passed with a
-pre-release version (e.g. 1.2.0.dev0 -C release=true) to log a checkpoint
-build without it counting as a production release. Routine pre-release/dev
+pre-release version (e.g. 1.2.0.dev0 -C release=true) to log and stage a
+checkpoint build without it counting as a production release. Routine pre-release/dev
 builds without the flag are not logged.
 
 releases.json is shaped {"latest": "X.Y.Z" | null, "versions": [...]}.
@@ -46,10 +46,13 @@ terminal; confirming once covers both the releases.json entry and the
 staged release/ folder for that version. Non-interactive builds (CI, no
 attached terminal) always refuse rather than block.
 
-A confirmed *final* release build (release=true on a non-pre-release
-version) additionally stages release/vX.Y.Z/ locally: a copy of the wheel,
+Any confirmed release build (release=true, whether a final version or a
+pre-release checkpoint) additionally stages release/vX.Y.Z/ locally: a copy of the wheel,
 its .sha256, and 3pslccacore.js rendered from 3pslccacore.template.js (the
-repo-root template) with RELEASE_WHEEL_URL filled in. Staged
+repo-root template) with RELEASE_WHEEL_URL and RELEASE_PYODIDE_URL (the
+Pyodide URL the release was built/tested against, also recorded in the
+ledger as pyodide_url; the wrapper self-loads Pyodide from it when the
+embedding page didn't include pyodide.js) filled in. Staged
 release/vX.Y.Z/ folders are disposable local output, never committed on
 web-dev (only release/releases.json is) -- a staging area, not the publish
 step. release.py picks up this already-assembled folder and bundles it
@@ -62,11 +65,12 @@ afterward, not collected here), and the entry's "notes" field is set true
 so index.html knows to link it.
 
 RELEASE_WHEEL_URL is rendered as a *fully-qualified* URL (github.io Pages
-origin, derived from `git remote get-url origin`), not a bare filename --
-deliberately, so the wheel resolves correctly even if the embedding page's
-script tag doesn't populate document.currentScript (dynamic insertion,
-module scripts, some bundlers) or the page is served from a different
-origin than the release. releases.json's release-kind entries record
+origin, derived from `git remote get-url origin`), not a bare filename. At
+runtime the wrapper prefers resolving the wheel's filename against its own
+document.currentScript.src (the wheel is always colocated with the script,
+so a staged-but-unpublished release works from any localhost server), and
+this absolute URL is the fallback for currentScript-less contexts
+(ES-module imports, bundler inlining). releases.json's release-kind entries record
 that same computed URL, plus the sha256 of *both* staged files (wheel_sha256
 and js_sha256) -- enough for an HTML page to link/verify a release without
 recomputing anything. Releases built with release=true are automatically marked "published": true in the ledger so they are ready to be served immediately once pushed.
@@ -91,6 +95,7 @@ RELEASE_DIR = ROOT / "release"
 RELEASES_FILE = RELEASE_DIR / "releases.json"
 JS_TEMPLATE_FILE = ROOT / "3pslccacore.template.js"
 RELEASE_URL_PATTERN = re.compile(r'const RELEASE_WHEEL_URL = "[^"]*";')
+RELEASE_PYODIDE_URL_PATTERN = re.compile(r'const RELEASE_PYODIDE_URL = "[^"]*";')
 
 get_requires_for_build_sdist = _orig.get_requires_for_build_sdist
 get_requires_for_build_wheel = _orig.get_requires_for_build_wheel
@@ -317,21 +322,25 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
     return sha256
 
 
-def _render_release_js(wheel_url):
-    src = JS_TEMPLATE_FILE.read_text(encoding="utf-8")
-    rendered, count = RELEASE_URL_PATTERN.subn(
-        f'const RELEASE_WHEEL_URL = "{wheel_url}";', src
-    )
-    if count != 1:
-        raise SystemExit(
-            f"error: expected exactly one RELEASE_WHEEL_URL declaration in "
-            f"{JS_TEMPLATE_FILE.name}, found {count}. The file may have changed "
-            "shape -- update RELEASE_URL_PATTERN in _build_backend.py to match."
-        )
+def _render_release_js(wheel_url, pyodide_url):
+    rendered = JS_TEMPLATE_FILE.read_text(encoding="utf-8")
+    for name, pattern, replacement in (
+        ("RELEASE_WHEEL_URL", RELEASE_URL_PATTERN,
+         f'const RELEASE_WHEEL_URL = "{wheel_url}";'),
+        ("RELEASE_PYODIDE_URL", RELEASE_PYODIDE_URL_PATTERN,
+         f'const RELEASE_PYODIDE_URL = "{pyodide_url}";'),
+    ):
+        rendered, count = pattern.subn(replacement, rendered)
+        if count != 1:
+            raise SystemExit(
+                f"error: expected exactly one {name} declaration in "
+                f"{JS_TEMPLATE_FILE.name}, found {count}. The file may have changed "
+                "shape -- update the pattern in _build_backend.py to match."
+            )
     return rendered
 
 
-def _stage_release(wheel_directory, filename, parsed_version):
+def _stage_release(wheel_directory, filename, parsed_version, pyodide_url):
     release_dir = RELEASE_DIR / f"v{parsed_version}"
     if release_dir.exists():
         if not _confirm_overwrite(
@@ -358,7 +367,7 @@ def _stage_release(wheel_directory, filename, parsed_version):
     # normalizes text files to LF) stores/serves different bytes than what
     # got hashed below, so js_sha256 would match the local file but not the
     # one GitHub Pages actually serves.
-    js_path.write_text(_render_release_js(f"{url}/{filename}"), encoding="utf-8", newline="\n")
+    js_path.write_text(_render_release_js(f"{url}/{filename}", pyodide_url), encoding="utf-8", newline="\n")
     js_sha256 = _sha256_file(js_path)
 
     notes = _prompt_notes(parsed_version)
@@ -418,13 +427,18 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     filename = _orig.build_wheel(wheel_directory, config_settings, metadata_directory)
     sha256 = path = url = js_sha256 = notes = None
     pyodide_url = None
-    if release_confirmed and not parsed.is_prerelease:
+    if release_confirmed:
+        # Every release=true build -- prerelease checkpoints included --
+        # stages the complete artifact set (wheel, .sha256, rendered
+        # 3pslccacore.js). Only *publishing* remains final-only: the
+        # "published" flag, "latest", and release.py all still reject
+        # prereleases.
         val = config_settings.get("pyodide") if config_settings else None
         pyodide_url = prompt_pyodide_url(val, "missing Pyodide URL. In non-interactive mode, pass -C pyodide=URL.")
 
         # Staged first, recorded second: the ledger entry should only ever
         # claim a path/url that was actually assembled successfully.
-        sha256, path, url, js_sha256, notes = _stage_release(wheel_directory, filename, parsed)
+        sha256, path, url, js_sha256, notes = _stage_release(wheel_directory, filename, parsed, pyodide_url)
     _record_build(wheel_directory, filename, parsed, release_confirmed, sha256, path, url, js_sha256, notes, pyodide_url)
     return filename
 

@@ -25,8 +25,9 @@ Two branches share the work:
   below) that enforces the version rules, records confirmed builds in the
   ledger, and stages release folders.
 - `3pslccacore.template.js` — the browser wrapper template. Release builds
-  render it to `3pslccacore.js` with `RELEASE_WHEEL_URL` filled in; the
-  template itself is never loaded directly.
+  render it to `3pslccacore.js` with `RELEASE_WHEEL_URL` and
+  `RELEASE_PYODIDE_URL` filled in; the template itself is never loaded
+  directly.
 - `release.py` — validates a staged release against the ledger before
   publishing (it does not touch git at all). As a byproduct it assembles a
   `release/_publish/` bundle — gitignored, regenerated on every run, safe
@@ -96,10 +97,15 @@ Any build made with `-C release=true` is recorded in
 The flag also works with a pre-release version to log a checkpoint build
 without it counting as a production release.
 
-A confirmed **final** release build additionally stages
-`release/vX.Y.Z/` locally: the wheel, its `.sha256`, and `3pslccacore.js`
+Any `-C release=true` build (final or prerelease checkpoint) additionally
+stages `release/vX.Y.Z/` locally: the wheel, its `.sha256`, and `3pslccacore.js`
 rendered from the template with `RELEASE_WHEEL_URL` set to the release's
-fully-qualified GitHub Pages URL (derived from `git remote get-url origin`).
+fully-qualified GitHub Pages URL (derived from `git remote get-url origin`)
+and `RELEASE_PYODIDE_URL` set to the Pyodide URL the build was tested
+against (`-C pyodide=URL`, or prompted interactively; recorded in the
+ledger as `pyodide_url`). With both baked in, the released wrapper
+self-loads Pyodide when the embedding page didn't include it, so one
+`<script src=".../3pslccacore.js">` is enough.
 
 On an interactive terminal you may also be prompted to:
 

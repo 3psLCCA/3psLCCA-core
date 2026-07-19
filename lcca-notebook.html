@@ -21,6 +21,22 @@
       border-color: var(--danger);
     }
 
+    /* The notebook's status row carries more controls than other pages
+       (version chooser, source accordion, run/clear buttons) -- give the
+       status text the first line to itself and put all controls on a
+       second line, instead of squeezing the status into an ellipsis. */
+    .status-inner {
+      flex-wrap: wrap;
+      row-gap: 0.35rem;
+    }
+
+    .status-controls {
+      flex-basis: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
     .version-chooser {
       display: inline-flex;
       align-items: center;
@@ -71,7 +87,74 @@
       color: var(--text-faint);
     }
 
+    /* Accordion listing where the page actually loaded each file from
+       (script / wheel / pyodide). Highlighted when the script came from the
+       local staged release folder (localhost testing) instead of the
+       published site. */
+    #sourceDetails {
+      position: relative;
+    }
+
+    #sourceDetails[hidden] {
+      display: none;
+    }
+
+    #sourceDetails summary {
+      list-style: none;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-faint);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 0.1rem 0.4rem;
+      white-space: nowrap;
+    }
+
+    #sourceDetails summary::-webkit-details-marker {
+      display: none;
+    }
+
+    #sourceDetails summary::after {
+      content: " ▾";
+    }
+
+    #sourceDetails[open] summary::after {
+      content: " ▴";
+    }
+
+    #sourceDetails[data-local="true"] summary {
+      color: var(--warn);
+      border-color: var(--warn);
+    }
+
+    #sourceUrls {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 20;
+      /* solid background -- var(--surface) is translucent and lets the page
+         show through the dropdown */
+      background: #15161b;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.55rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      white-space: pre;
+      max-width: min(80vw, 46rem);
+      overflow-x: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
     /* Light theme overrides */
+    :root[data-theme="light"] #sourceUrls {
+      background: #ffffff;
+    }
+
     :root[data-theme="light"] #versionSelect {
       background-color: #eef0f4;
       color-scheme: light;
@@ -83,6 +166,10 @@
     }
 
     @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) #sourceUrls {
+        background: #ffffff;
+      }
+
       :root:not([data-theme="dark"]) #versionSelect {
         background-color: #eef0f4;
         color-scheme: light;
@@ -335,15 +422,21 @@
     <div class="wrap status-inner">
       <span class="status-dot"></span>
       <p id="status">Loading library... <span id="stageLabel" style="color:var(--text-faint);font-weight:400"></span></p>
-      <div class="version-chooser">
-        <label for="versionSelect">Version:</label>
-        <select id="versionSelect">
-          <option value="" disabled selected>Loading...</option>
-        </select>
-        <span id="pyodideVersionLabel"></span>
+      <div class="status-controls">
+        <div class="version-chooser">
+          <label for="versionSelect">Version:</label>
+          <select id="versionSelect">
+            <option value="" disabled selected>Loading...</option>
+          </select>
+          <span id="pyodideVersionLabel"></span>
+          <details id="sourceDetails" hidden>
+            <summary id="sourceSummary">source</summary>
+            <div id="sourceUrls"></div>
+          </details>
+        </div>
+        <button id="btnRunAll" class="runall" type="button" disabled>▶ run all</button>
+        <button id="btnClearAll" class="runall clearall" type="button">✕ clear all</button>
       </div>
-      <button id="btnRunAll" class="runall" type="button" disabled>▶ run all</button>
-      <button id="btnClearAll" class="runall clearall" type="button">✕ clear all</button>
     </div>
   </div>
 
@@ -451,11 +544,61 @@
         const pyodideVer = match ? (match[1].startsWith('v') ? match[1] : 'v' + match[1]) : 'WASM';
         document.getElementById("pyodideVersionLabel").textContent = `(Pyodide: ${pyodideVer})`;
 
+        // Fills the "source" accordion with where each file was actually
+        // loaded from. The wheel's source depends on the wrapper: builds
+        // from 1.0.2 on resolve it next to the script's own src, while
+        // 1.0.0/1.0.1 always fetch the absolute URL baked in at release
+        // time -- so a locally-served old script still pulls its wheel
+        // from github.io.
+        function showSources(scriptUrl, isLocalScript) {
+          const scriptAbs = new URL(scriptUrl, window.location.href).href;
+          const [maj, min, pat] = entryToLoad.version.split(".").map((n) => parseInt(n, 10) || 0);
+          const derivesWheel = maj > 1 || min > 0 || pat >= 2;
+          const wheelAbs = derivesWheel
+            ? new URL(entryToLoad.filename, scriptAbs).href
+            : `${entryToLoad.url}/${entryToLoad.filename}`;
+          const origin = window.location.origin;
+          const tag = (u) => (u.startsWith(origin) ? " (this server)" : "");
+
+          const det = document.getElementById("sourceDetails");
+          det.hidden = false;
+          det.dataset.local = String(isLocalScript);
+          document.getElementById("sourceSummary").textContent =
+            isLocalScript ? (wheelAbs.startsWith(origin) ? "local script+wheel" : "local script") : "source";
+          document.getElementById("sourceUrls").textContent =
+            `script:  ${scriptAbs}${tag(scriptAbs)}\n` +
+            `wheel:   ${wheelAbs}${tag(wheelAbs)}\n` +
+            `pyodide: ${pyodideUrl}`;
+        }
+
         setStatus(`Loading Pyodide...`);
         return loadScript(pyodideUrl).then(() => {
+          const remoteUrl = `${entryToLoad.url}/3pslccacore.js`;
+          // Served from localhost (repo root via e.g. `python -m
+          // http.server`): load the release script from the local staged
+          // folder. Wrappers from 1.0.2 on resolve their wheel against the
+          // script's own src, so both come from this server -- which is
+          // what makes a freshly staged, not-yet-published build testable
+          // (its github.io URLs don't exist yet). Same file as the
+          // published one, so SRI still applies. No local copy falls back
+          // to the remote script.
+          const isLocalHost = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+          if (isLocalHost && entryToLoad.path) {
+            setStatus(`Loading local 3pslccacore.js ${entryToLoad.version}...`);
+            const localUrl = `./${entryToLoad.path}/3pslccacore.js`;
+            return loadScript(localUrl, entryToLoad.js_sha256).then(() => {
+              showSources(localUrl, true);
+            }).catch(() => {
+              setStatus(`No local copy; loading 3pslccacore.js ${entryToLoad.version}...`);
+              return loadScript(remoteUrl, entryToLoad.js_sha256).then(() => {
+                showSources(remoteUrl, false);
+              });
+            });
+          }
           setStatus(`Loading 3pslccacore.js ${entryToLoad.version}...`);
-          const scriptUrl = `${entryToLoad.url}/3pslccacore.js`;
-          return loadScript(scriptUrl, entryToLoad.js_sha256);
+          return loadScript(remoteUrl, entryToLoad.js_sha256).then(() => {
+            showSources(remoteUrl, false);
+          });
         });
       })
       .then(() => {

@@ -2,8 +2,11 @@
 // from the local wheel via micropip, and exposes the functions needed to
 // run a life-cycle cost analysis from the browser.
 //
-// Must be loaded after https://cdn.jsdelivr.net/pyodide/v.../full/pyodide.js
-// and before any script that uses `window.ThreePsLccaCore`.
+// A release build loads Pyodide on its own (from the baked-in
+// RELEASE_PYODIDE_URL below) the first time it's needed, so a single
+// <script src=".../3pslccacore.js"> is enough. Loading pyodide.js with your
+// own <script> tag beforehand still works and takes precedence. Must be
+// loaded before any script that uses `window.ThreePsLccaCore`.
 
 (function (global) {
   // This is the release template (hence the .template.js name) -- it is
@@ -13,33 +16,72 @@
   // RELEASE_WHEEL_URL below
   // with that release's *fully-qualified* wheel URL (its github.io Pages
   // origin, computed from `git remote get-url origin`, + release/vX.Y.Z/ +
-  // filename), and stage the result alongside the wheel itself in
+  // filename) and RELEASE_PYODIDE_URL with the Pyodide URL the release was
+  // built and tested against (the ledger's pyodide_url), and stage the
+  // result alongside the wheel itself in
   // release/vX.Y.Z/ (local staging only, never committed on web-dev).
   // release.py then bundles that already-assembled folder into
   // release/_publish/, whose contents are copied manually onto the web
   // branch (the one GitHub Pages serves; development happens on web-dev
   // instead, see DEVELOPER.md) -- it doesn't render this file itself.
   //
-  // RELEASE_WHEEL_URL is deliberately baked in as an absolute URL rather
-  // than a path resolved at runtime against document.currentScript.src:
-  // that resolution breaks if the script tag doesn't populate
-  // currentScript (dynamic insertion, module scripts, some bundlers), and
-  // if the embedding page happens to be served from a different origin
-  // than the release, a relative path would resolve against the *page's*
-  // origin instead of the wheel's and fail to fetch. An absolute URL has
-  // neither problem. RELEASE_WHEEL_URL is a plain string literal (not a
-  // template token) so this file stays valid, runnable JS in every
-  // staged/published copy.
+  // The wheel's URL is resolved at runtime, in order of preference:
+  //   1. Script-src-relative: the wheel is always staged/published next to
+  //      this script in release/vX.Y.Z/, so resolving the wheel's filename
+  //      against document.currentScript.src finds it wherever that folder
+  //      is served from -- github.io, a localhost server during testing, a
+  //      mirror. (currentScript IS set for classic scripts however they're
+  //      inserted, including dynamic injection; it's only null for
+  //      ES modules and code copied inline/bundled.)
+  //   2. The baked-in absolute RELEASE_WHEEL_URL -- the release's canonical
+  //      published URL -- for exactly those currentScript-less contexts.
+  // Consequence: serving this file *without* the wheel colocated fails
+  // checkEnvironment's reachability pre-check with a clear message; the
+  // `wheelUrl` option overrides either resolution. RELEASE_WHEEL_URL is a
+  // plain string literal (not a template token) so this file stays valid,
+  // runnable JS in every staged/published copy.
   const RELEASE_WHEEL_URL = "";
+  // Stamped the same way as RELEASE_WHEEL_URL, from the same ledger entry
+  // (releases.json pyodide_url). init() only uses it when the page didn't
+  // load pyodide.js itself -- a page-provided Pyodide always wins, so the
+  // pre-existing two-<script> embedding keeps working unchanged.
+  const RELEASE_PYODIDE_URL = "";
   const PACKAGE_NAME = "three_ps_lcca_core";
 
-  // This repo-root copy has RELEASE_WHEEL_URL empty (it's a template, not a
-  // release) -- for local dev testing, pass the wheel's URL explicitly via
-  // the `wheelUrl` option to init()/performAnalysis() instead.
-  const WHEEL_URL = RELEASE_WHEEL_URL;
+  // Captured now, during script evaluation -- currentScript is null again
+  // once execution moves past this script.
+  const SCRIPT_SRC =
+    typeof document !== "undefined" && document.currentScript && document.currentScript.src
+      ? document.currentScript.src
+      : null;
+
+  function resolveWheelUrl() {
+    if (!RELEASE_WHEEL_URL || !SCRIPT_SRC) return RELEASE_WHEEL_URL;
+    const filename = RELEASE_WHEEL_URL.split("/").pop();
+    try {
+      return new URL(filename, SCRIPT_SRC).href;
+    } catch (e) {
+      return RELEASE_WHEEL_URL;
+    }
+  }
+
+  // This repo-root copy has both RELEASE_* URLs empty (it's a template, not
+  // a release), which leaves WHEEL_URL empty too -- for local dev testing,
+  // pass the wheel's URL explicitly via the `wheelUrl` option to
+  // init()/performAnalysis() (and, if the page doesn't include pyodide.js
+  // itself, a `pyodideUrl`) instead.
+  const WHEEL_URL = resolveWheelUrl();
+  const PYODIDE_URL = RELEASE_PYODIDE_URL;
 
   let pyodidePromise = null;
   let activeWheelUrl = null;
+  // The pyodide.js <script> is injected at most once per page: a loaded
+  // script can't be unloaded, so a *different* pyodideUrl passed after
+  // Pyodide is already on the page can't take effect (init() warns and
+  // keeps the loaded copy). A *failed* injection is not cached; the next
+  // init() re-injects.
+  let pyodideScriptPromise = null;
+  let activePyodideUrl = null;
   // Monotonic id of the latest init attempt. A superseded attempt (a newer
   // init started with a different wheel URL while it was in flight) keeps
   // running, but must no longer write to the shared `state` below.
@@ -47,8 +89,8 @@
 
   // Tracks how far initialization got, so callers can tell exactly what is
   // (or isn't) installed. `stage` is one of: idle, checking-environment,
-  // booting-pyodide, loading-micropip, fetching-wheel, installing-wheel,
-  // verifying-package, ready, error.
+  // loading-pyodide-script, booting-pyodide, loading-micropip,
+  // fetching-wheel, installing-wheel, verifying-package, ready, error.
   const state = {
     stage: "idle",
     pyodideVersion: null,
@@ -146,9 +188,10 @@
 
   // Pre-flight checks that don't need Pyodide running yet. Returns a list of
   // human-readable problems; empty list means the environment looks usable.
-  async function checkEnvironment(customWheelUrl) {
+  async function checkEnvironment(customWheelUrl, customPyodideUrl) {
     const problems = [];
     const wheelUrl = customWheelUrl || WHEEL_URL;
+    const pyodideUrl = customPyodideUrl || activePyodideUrl || PYODIDE_URL;
 
     if (isOffline()) {
       problems.push(OFFLINE_MESSAGE);
@@ -163,11 +206,15 @@
       );
     }
 
-    if (typeof global.loadPyodide !== "function") {
+    // Pyodide missing from the page is only a problem when there's no URL
+    // to load it from on demand -- a release build has one baked in, so
+    // init() fetches it itself.
+    if (typeof global.loadPyodide !== "function" && !pyodideUrl) {
       problems.push(
-        "Pyodide is not loaded: `loadPyodide` is undefined. Include " +
-          '<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script> ' +
-          "before 3pslccacore.js."
+        "Pyodide is not loaded and no Pyodide URL is configured: this copy " +
+          "is the un-rendered template with no baked-in URL. Include " +
+          '<script src=".../pyodide.js"></script> before 3pslccacore.js, ' +
+          "or pass its URL via the `pyodideUrl` option."
       );
     }
 
@@ -209,23 +256,79 @@
     return problems;
   }
 
+  // Injects <script src=pyodideUrl> into the page and resolves once
+  // `loadPyodide` exists. No-op when Pyodide is already on the page (a
+  // page-provided copy always wins). Shared across concurrent init
+  // attempts; a failed load clears the cache so the next call re-injects.
+  function loadPyodideScript(pyodideUrl) {
+    if (typeof global.loadPyodide === "function") return Promise.resolve();
+    if (!pyodideScriptPromise) {
+      pyodideScriptPromise = new Promise((resolve, reject) => {
+        const doc = global.document;
+        if (!doc || !doc.head) {
+          reject(new Error("No DOM available to inject the Pyodide <script> into."));
+          return;
+        }
+        const script = doc.createElement("script");
+        script.src = pyodideUrl;
+        script.onload = () => {
+          if (typeof global.loadPyodide === "function") {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `Script at ${pyodideUrl} loaded but did not define \`loadPyodide\` -- ` +
+                  "is it really pyodide.js?"
+              )
+            );
+          }
+        };
+        script.onerror = () => {
+          script.remove();
+          reject(new Error(`Failed to load Pyodide script from ${pyodideUrl}.`));
+        };
+        doc.head.appendChild(script);
+      });
+      pyodideScriptPromise.catch(() => {
+        pyodideScriptPromise = null;
+      });
+    }
+    return pyodideScriptPromise;
+  }
+
   // Idempotent: repeated calls return the same in-flight/settled promise.
   // Rejects with an Error carrying a `.stage` property naming the failed step.
   //
   // - Omitting `customWheelUrl` reuses the URL of the current/previous
   //   attempt (falling back to the baked-in WHEEL_URL), so a follow-up call
   //   without options doesn't tear down a runtime that was initialized with
-  //   an explicit wheelUrl.
+  //   an explicit wheelUrl. `customPyodideUrl` behaves the same way
+  //   (falling back to the baked-in PYODIDE_URL).
   // - A failed attempt is not cached: the next call starts over, so
   //   "reconnect and try again" actually works.
   // - Passing a *different* wheel URL starts a fresh attempt; a superseded
-  //   in-flight attempt keeps running but stops touching `state`.
+  //   in-flight attempt keeps running but stops touching `state`. A
+  //   different *Pyodide* URL cannot do that -- a loaded pyodide.js script
+  //   can't be unloaded -- so once Pyodide is on the page the option is
+  //   ignored with a console warning.
   // - Progress notifications only reach the `onStatus` of the call that
   //   started the attempt; later callers joining an in-flight init share
   //   its promise but get no status callbacks.
-  function init(onStatus, customWheelUrl) {
+  function init(onStatus, customWheelUrl, customPyodideUrl) {
     const notify = onStatus || (() => {});
     const wheelUrl = customWheelUrl || activeWheelUrl || WHEEL_URL;
+    const pyodideUrl = customPyodideUrl || activePyodideUrl || PYODIDE_URL;
+    if (
+      customPyodideUrl &&
+      typeof global.loadPyodide === "function" &&
+      customPyodideUrl !== activePyodideUrl
+    ) {
+      console.warn(
+        "[ThreePsLccaCore] Pyodide is already loaded on this page; the " +
+          "`pyodideUrl` option only applies before Pyodide first loads and " +
+          "is ignored now."
+      );
+    }
     if (pyodidePromise && activeWheelUrl !== wheelUrl) {
       pyodidePromise = null;
     }
@@ -241,6 +344,7 @@
         );
       }
       activeWheelUrl = wheelUrl;
+      activePyodideUrl = pyodideUrl;
       const attemptId = ++initAttempt;
       const current = () => attemptId === initAttempt;
       // These write to the shared `state` (and fire onStatus) only while
@@ -264,9 +368,22 @@
 
       const attempt = (async () => {
         setStage("checking-environment", "Checking environment...");
-        const problems = await checkEnvironment(wheelUrl);
+        const problems = await checkEnvironment(wheelUrl, pyodideUrl);
         if (problems.length > 0) {
           throw stageFail("checking-environment", problems.join(" | "));
+        }
+
+        // checkEnvironment guarantees pyodideUrl is non-empty whenever
+        // loadPyodide is absent, so this stage always has a URL to fetch.
+        if (typeof global.loadPyodide !== "function") {
+          setStage("loading-pyodide-script", "Loading Pyodide script...");
+          try {
+            await loadPyodideScript(pyodideUrl);
+          } catch (e) {
+            throw looksLikeNetworkError(e)
+              ? stageFailOffline("loading-pyodide-script", e)
+              : stageFail("loading-pyodide-script", String((e && e.message) || e));
+          }
         }
 
         setStage("booting-pyodide", "Booting Pyodide runtime...");
@@ -420,13 +537,13 @@ def _guarded(fn):
 `;
 
   async function performAnalysis(inputData, constructionCosts, wpi, options = {}) {
-    const { debug = false, onStatus, onOutput, wheelUrl } = options;
+    const { debug = false, onStatus, onOutput, wheelUrl, pyodideUrl } = options;
 
     requirePlainObject("inputData", inputData);
     requirePlainObject("constructionCosts", constructionCosts);
     requirePlainObject("wpi", wpi);
 
-    const pyodide = await init(onStatus, wheelUrl);
+    const pyodide = await init(onStatus, wheelUrl, pyodideUrl);
 
     pyodide.globals.set("input_data_json", JSON.stringify(inputData));
     pyodide.globals.set("wpi_json", JSON.stringify(wpi));
@@ -454,8 +571,8 @@ _guarded(_run)
   // Indian Road Congress (IRC) standard constraints and default values
   // (IRC SP:30-2019 and IRC 106:1990), as exposed by the Python core.
   async function getIrcStandardSuggestions(options = {}) {
-    const { onStatus, onOutput, wheelUrl } = options;
-    const pyodide = await init(onStatus, wheelUrl);
+    const { onStatus, onOutput, wheelUrl, pyodideUrl } = options;
+    const pyodide = await init(onStatus, wheelUrl, pyodideUrl);
 
     return runPythonJson(
       pyodide,
