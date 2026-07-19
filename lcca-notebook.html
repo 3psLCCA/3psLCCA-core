@@ -10,9 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
   <link rel="stylesheet" href="./assets/site.css" />
   <script src="./assets/theme.js"></script>
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-  <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"
-    integrity="sha256-qgawHfOZqxF/QEf+rp7SEecZMYlOrdnP/zcY0qVXM68=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jshint@2.13.6/dist/jshint.js"></script>
   <style>
     .clearall {
@@ -22,6 +20,72 @@
     .clearall:hover:not(:disabled) {
       color: var(--danger);
       border-color: var(--danger);
+    }
+
+    .version-chooser {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .version-chooser label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    #versionSelect {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background-color: #15161b;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.3rem 1.6rem 0.3rem 0.6rem;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.15s ease;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      background-size: 0.7rem;
+      line-height: normal;
+      color-scheme: dark;
+    }
+
+    #versionSelect:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    #versionSelect option {
+      background-color: #15161b;
+      color: #e7e9ee;
+    }
+
+    /* Light theme overrides */
+    :root[data-theme="light"] #versionSelect {
+      background-color: #eef0f4;
+      color-scheme: light;
+    }
+
+    :root[data-theme="light"] #versionSelect option {
+      background-color: #ffffff;
+      color: #1c2333;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) #versionSelect {
+        background-color: #eef0f4;
+        color-scheme: light;
+      }
+      :root:not([data-theme="dark"]) #versionSelect option {
+        background-color: #ffffff;
+        color: #1c2333;
+      }
     }
 
     header {
@@ -265,8 +329,14 @@
   <div class="statusbar">
     <div class="wrap status-inner">
       <span class="status-dot"></span>
-      <p id="status">Not initialized. <span id="stageLabel" style="color:var(--text-faint);font-weight:400"></span></p>
-      <button id="btnRunAll" class="runall" type="button">▶ run all</button>
+      <p id="status">Loading library... <span id="stageLabel" style="color:var(--text-faint);font-weight:400"></span></p>
+      <div class="version-chooser">
+        <label for="versionSelect">Version:</label>
+        <select id="versionSelect">
+          <option value="" disabled selected>Loading...</option>
+        </select>
+      </div>
+      <button id="btnRunAll" class="runall" type="button" disabled>▶ run all</button>
       <button id="btnClearAll" class="runall clearall" type="button">✕ clear all</button>
     </div>
   </div>
@@ -294,13 +364,108 @@
   </footer>
 
   <script>
-    const api = window.ThreePsLccaCore;
-    const { getState } = api;
+    let api;
+    let getState;
 
     function setStatus(text) {
       document.getElementById("status").firstChild.textContent = text + " ";
-      document.getElementById("stageLabel").textContent = `(stage: ${getState().stage})`;
+      if (getState) {
+        document.getElementById("stageLabel").textContent = `(stage: ${getState().stage})`;
+      } else {
+        document.getElementById("stageLabel").textContent = "";
+      }
     }
+
+    // ---- dynamic script loading & version selection ----
+    function hexToBase64(hex) {
+      const bytes = hex.match(/.{2}/g).map((b) => parseInt(b, 16));
+      return btoa(String.fromCharCode(...bytes));
+    }
+
+    function loadScript(url, sha256) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = url;
+        if (sha256) {
+          script.integrity = `sha256-${hexToBase64(sha256)}`;
+          script.crossOrigin = "anonymous";
+        }
+        script.onload = () => {
+          api = window.ThreePsLccaCore;
+          if (api) {
+            getState = api.getState;
+            resolve();
+          } else {
+            reject(new Error("window.ThreePsLccaCore is not defined after script load"));
+          }
+        };
+        script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+        document.head.appendChild(script);
+      });
+    }
+
+    const versionSelect = document.getElementById("versionSelect");
+    const params = new URLSearchParams(window.location.search);
+    let selectedVersion = params.get("v");
+
+    setStatus("Loading releases metadata...");
+
+    fetch("./release/releases.json")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => {
+        const versions = (data.versions || []).filter(v => v.url);
+        if (versions.length === 0) {
+          throw new Error("No published versions found in releases metadata.");
+        }
+
+        versionSelect.innerHTML = "";
+
+        let targetVersion = selectedVersion;
+        if (!targetVersion || !versions.some(v => v.version === targetVersion)) {
+          targetVersion = data.latest || versions[0].version;
+        }
+
+        const sorted = [...versions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+        sorted.forEach((entry) => {
+          const opt = document.createElement("option");
+          opt.value = entry.version;
+          let label = entry.version;
+          if (entry.version === data.latest) {
+            label += " (latest)";
+          }
+          if (entry.kind === "prerelease") {
+            label += " (pre)";
+          }
+          opt.textContent = label;
+          opt.selected = (entry.version === targetVersion);
+          versionSelect.appendChild(opt);
+        });
+
+        const entryToLoad = versions.find(v => v.version === targetVersion);
+        if (!entryToLoad) {
+          throw new Error(`Could not find release configuration for version ${targetVersion}`);
+        }
+
+        setStatus(`Loading 3pslccacore.js ${entryToLoad.version}...`);
+        const scriptUrl = `${entryToLoad.url}/3pslccacore.js`;
+        return loadScript(scriptUrl, entryToLoad.js_sha256);
+      })
+      .then(() => {
+        setStatus("Not initialized.");
+        document.querySelectorAll(".cell-run").forEach(btn => btn.disabled = false);
+        document.getElementById("btnRunAll").disabled = false;
+      })
+      .catch((err) => {
+        setStatus(`Failed to load library: ${err.message || err}`);
+        document.getElementById("status").className = "error";
+      });
+
+    versionSelect.addEventListener("change", (e) => {
+      const val = e.target.value;
+      const params = new URLSearchParams(window.location.search);
+      params.set("v", val);
+      window.location.search = params.toString();
+    });
 
     // ---- notebook cells (title, description, editable source) ----
     const CELLS = [
@@ -407,7 +572,7 @@ display(resultGlobal);`,
     <textarea class="cell-code" spellcheck="false"></textarea>
     <div class="cell-lint"></div>
     <div class="cell-bar">
-      <button class="cell-run" type="button">▶ run</button>
+      <button class="cell-run" type="button" disabled>▶ run</button>
       <span class="cell-state"></span>
       <span class="cell-lint-state"></span>
     </div>

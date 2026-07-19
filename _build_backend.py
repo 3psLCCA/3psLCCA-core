@@ -69,11 +69,7 @@ module scripts, some bundlers) or the page is served from a different
 origin than the release. releases.json's release-kind entries record
 that same computed URL, plus the sha256 of *both* staged files (wheel_sha256
 and js_sha256) -- enough for an HTML page to link/verify a release without
-recomputing anything. Every entry also starts with "published": false;
-you flip it to true by hand after actually pushing the release to the web
-branch, so index.html (via release.py, which only ever publishes
-published-or-current entries) never links to a version that isn't really
-there.
+recomputing anything. Releases built with release=true are automatically marked "published": true in the ledger so they are ready to be served immediately once pushed.
 """
 
 import datetime
@@ -236,8 +232,32 @@ def _confirm_latest(parsed_version, current_latest):
     return answer in ("y", "yes")
 
 
+def validate_pyodide_link(url):
+    if not url.startswith(("http://", "https://")):
+        raise SystemExit(f"error: Pyodide URL must start with http:// or https:// (got: '{url}')")
+    if not (url.endswith("pyodide.js") or url.endswith("pyodide.min.js")):
+        raise SystemExit(f"error: Pyodide URL must end with 'pyodide.js' or 'pyodide.min.js' (got: '{url}')")
+
+
+def prompt_pyodide_url(value=None, required_error=None):
+    url = value
+    if not url:
+        if sys.stdin.isatty():
+            try:
+                url = input("Enter the Pyodide URL: ").strip()
+                while not url:
+                    url = input("Pyodide URL is required. Enter the Pyodide URL: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\nAborted.")
+                sys.exit(1)
+        else:
+            raise SystemExit(f"error: {required_error or 'missing Pyodide URL.'}")
+    validate_pyodide_link(url)
+    return url
+
+
 def _record_build(directory, filename, parsed_version, release_confirmed,
-                   sha256=None, path=None, url=None, js_sha256=None, notes=None):
+                   sha256=None, path=None, url=None, js_sha256=None, notes=None, pyodide_url=None):
     if not release_confirmed:
         return None
     if sha256 is None:
@@ -277,11 +297,10 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
         "wheel_sha256": sha256,
         "js_sha256": js_sha256,
         "notes": notes,
+        "pyodide_url": pyodide_url,
         "commit": _git_commit(),
-        # Flipped to True by hand only after this version is actually pushed
-        # to the web branch -- staging/recording here means "built", not
-        # "published".
-        "published": False,
+        # Automatically mark as published if this is a confirmed final release build
+        "published": release_confirmed and not parsed_version.is_prerelease,
     }
     versions.append(entry)
 
@@ -398,11 +417,15 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     parsed, release_confirmed = _stamp_version(config_settings)
     filename = _orig.build_wheel(wheel_directory, config_settings, metadata_directory)
     sha256 = path = url = js_sha256 = notes = None
+    pyodide_url = None
     if release_confirmed and not parsed.is_prerelease:
+        val = config_settings.get("pyodide") if config_settings else None
+        pyodide_url = prompt_pyodide_url(val, "missing Pyodide URL. In non-interactive mode, pass -C pyodide=URL.")
+
         # Staged first, recorded second: the ledger entry should only ever
         # claim a path/url that was actually assembled successfully.
         sha256, path, url, js_sha256, notes = _stage_release(wheel_directory, filename, parsed)
-    _record_build(wheel_directory, filename, parsed, release_confirmed, sha256, path, url, js_sha256, notes)
+    _record_build(wheel_directory, filename, parsed, release_confirmed, sha256, path, url, js_sha256, notes, pyodide_url)
     return filename
 
 

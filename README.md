@@ -17,7 +17,7 @@ This is the **`web` branch**: the branch GitHub Pages serves. Besides the Python
 One script tag per release — the wheel URL is baked in, no server or install needed:
 
 ```html
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script>
 <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"></script>
 <script>
   const { sample, performAnalysis } = window.ThreePsLccaCore;

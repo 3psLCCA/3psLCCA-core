@@ -166,7 +166,7 @@
     if (typeof global.loadPyodide !== "function") {
       problems.push(
         "Pyodide is not loaded: `loadPyodide` is undefined. Include " +
-          '<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script> ' +
+          '<script src="https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js"></script> ' +
           "before 3pslccacore.js."
       );
     }

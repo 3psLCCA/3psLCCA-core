@@ -18,9 +18,7 @@ locally), and the staged release/vX.Y.Z/ folder -- into release/_publish/
 locally. Copy that folder's *contents* onto the web branch yourself
 (checkout web, copy, `git add -A`, commit, push) -- that part is manual.
 
-After you've actually pushed, flip this version's "published" field to
-true in release/releases.json yourself, so future runs of this script
-carry it forward into the filtered payload for later releases.
+Releases built with release=true are automatically marked "published": true in releases.json, so future runs of this script carry it forward into the filtered payload for later releases automatically.
 
 Usage, after a production wheel build:
 
@@ -36,6 +34,8 @@ import shutil
 import sys
 
 from packaging.version import InvalidVersion, Version
+
+from _build_backend import prompt_pyodide_url
 
 ROOT = pathlib.Path(__file__).resolve().parent
 PACKAGE_NAME = "three_ps_lcca_core"
@@ -53,11 +53,17 @@ def parse_args():
         required=True,
         help="Version being released, e.g. 1.2.0 (must be a final, non-prerelease PEP 440 version).",
     )
+    parser.add_argument(
+        "--pyodide",
+        required=False,
+        help="Pyodide URL used for testing, e.g. https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js",
+    )
     return parser.parse_args()
 
 
 def fail(message):
     sys.exit(f"error: {message}")
+
 
 
 def validate_version(raw):
@@ -137,11 +143,16 @@ def published_releases_payload(data, version):
 def main():
     args = parse_args()
     version = validate_version(args.version)
-    wheel, sha_file, js_file, notes_file = find_staged_release(version)
 
     if not INDEX_HTML_FILE.is_file():
         fail(f"{INDEX_HTML_FILE.relative_to(ROOT)} not found.")
     local_data = load_local_releases()
+    ledger_entry = find_ledger_entry(local_data, version)
+
+    pyodide_url = args.pyodide or ledger_entry.get("pyodide_url")
+    pyodide_url = prompt_pyodide_url(pyodide_url, "missing Pyodide URL. Pass --pyodide URL.")
+
+    wheel, sha_file, js_file, notes_file = find_staged_release(version)
     pages_releases = published_releases_payload(local_data, version)
 
     if PUBLISH_DIR.exists():
@@ -166,8 +177,8 @@ def main():
             print(f"  {p.relative_to(PUBLISH_DIR).as_posix()}")
     print(
         f"\nNext (manual): checkout web, copy {PUBLISH_DIR.relative_to(ROOT).as_posix()}/* over its "
-        f"root, git add -A, commit, push. Afterward, set \"published\": true for {version} in "
-        f"{RELEASES_FILE.relative_to(ROOT)} yourself."
+        f"root, git add -A, commit, and push.\n"
+        f"Note: This release was tested with Pyodide: {pyodide_url}"
     )
 
 
