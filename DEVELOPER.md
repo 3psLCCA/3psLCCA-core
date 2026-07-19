@@ -11,11 +11,9 @@ Two branches share the work:
 
 - **`web-dev`** — where development happens: source, tooling, and the
   committed release ledger (`release/releases.json`).
-- **`web`** — what GitHub Pages serves. Reserved for published release
-  content only, kept separate so source history and publish history don't
-  get mixed. Content lands here by copying the assembled
-  `release/_publish/` output onto it (see "Publishing a release" below),
-  not by merging.
+- **`web`** — what GitHub Pages serves. Release content (`release/vX.Y.Z/`
+  folders plus the ledger) is committed here directly, not merged from
+  `web-dev` (see "Publishing a release" below).
 
 ## Layout
 
@@ -29,8 +27,10 @@ Two branches share the work:
 - `3pslccacore.template.js` — the browser wrapper template. Release builds
   render it to `3pslccacore.js` with `RELEASE_WHEEL_URL` filled in; the
   template itself is never loaded directly.
-- `release.py` — assembles a ready-to-publish bundle in `release/_publish/`
-  (it does not touch git at all).
+- `release.py` — validates a staged release against the ledger before
+  publishing (it does not touch git at all). As a byproduct it assembles a
+  `release/_publish/` bundle — gitignored, regenerated on every run, safe
+  to delete; everything in it already exists in place.
 - `verify_releases.py` — re-hashes wheels/JS in `dist/` and `release/`
   against `release/releases.json`; missing files are skipped, not flagged.
 - `index.html` — the releases page published to GitHub Pages.
@@ -129,14 +129,11 @@ ledger, not an artifact.
 ## Publishing a release
 
 Once you have a production wheel (`-C release=true` on a final version, so
-`release/vX.Y.Z/` is staged), run `release.py`. It does **not** touch git —
-no clone, no commit, no push. It validates the version (final releases
-only), checks the staged files and ledger entry, and assembles everything
-the `web` branch's root needs into `release/_publish/`: `index.html`,
-`.nojekyll`, the staged `release/vX.Y.Z/` folder, and a filtered
-`release/releases.json` containing only versions already marked
-`"published": true` plus the one being released now — so the published page
-never links to a version that only ever existed locally.
+`release/vX.Y.Z/` is staged), run `release.py` as a pre-publish check. It
+does **not** touch git — no clone, no commit, no push. It validates the
+version (final releases only) and checks the staged files against the
+ledger entry. (It also assembles a `release/_publish/` bundle; that folder
+is gitignored and disposable — everything lives in `release/` itself.)
 
 ```bash
 python -m build --wheel -C version=1.2.0 -C release=true
@@ -145,12 +142,12 @@ python release.py --version 1.2.0
 
 Then publish manually:
 
-1. Check out `web`.
-2. Copy the *contents* of `release/_publish/` over the branch root.
-3. `git add -A`, commit, push.
-4. Back on `web-dev`, set `"published": true` for that version in
-   `release/releases.json`, so future `release.py` runs carry it forward
-   into the published payload.
+1. Fill in `release/vX.Y.Z/NOTES.md` if you scaffolded one.
+2. On `web`, commit the release in place: `release/vX.Y.Z/` and the updated
+   `release/releases.json` (plus `index.html` if it changed).
+3. Push.
+4. Set `"published": true` for that version in `release/releases.json`, so
+   the ledger records it as actually live.
 
 Published releases are immutable: don't hand-edit files on `web`, and bump
 the version instead of restaging one that's already recorded (the build
