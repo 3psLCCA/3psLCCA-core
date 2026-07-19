@@ -15,8 +15,9 @@
   // origin, computed from `git remote get-url origin`, + release/vX.Y.Z/ +
   // filename), and stage the result alongside the wheel itself in
   // release/vX.Y.Z/ (gitignored, local only). release.py then copies that
-  // already-assembled folder onto the feature/js-client-delivery branch
-  // (see DEVELOPING.md) -- it doesn't render this file itself.
+  // already-assembled folder onto the web branch (the one GitHub Pages
+  // serves; development happens on web-dev instead, see DEVELOPING.md) --
+  // it doesn't render this file itself.
   //
   // RELEASE_WHEEL_URL is deliberately baked in as an absolute URL rather
   // than a path resolved at runtime against document.currentScript.src:

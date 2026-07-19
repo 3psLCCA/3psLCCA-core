@@ -52,8 +52,9 @@ its .sha256, and 3pslccacore.js rendered from 3pslccacore.template.js (the
 repo-root template) with RELEASE_WHEEL_URL filled in. release/ is
 gitignored, same as dist/ -- it's a local staging area, not the publish
 step. release.py picks up this already-assembled folder and copies it into
-the feature/js-client-delivery branch; it no longer renders 3pslccacore.js
-itself. On an interactive terminal you're also asked whether to add a
+the web branch (the one GitHub Pages serves; development happens on
+web-dev instead); it no longer renders 3pslccacore.js itself. On an
+interactive terminal you're also asked whether to add a
 NOTES.md -- an empty scaffold file is created (content is hand-edited
 afterward, not collected here), and the entry's "notes" field is set true
 so index.html knows to link it.
@@ -275,8 +276,8 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
         "notes": notes,
         "commit": _git_commit(),
         # Set True only by release.py, after it actually pushes this version
-        # to feature/js-client-delivery -- staging/recording here means
-        # "built", not "published".
+        # to the web branch -- staging/recording here means "built", not
+        # "published".
         "published": False,
     }
     versions.append(entry)

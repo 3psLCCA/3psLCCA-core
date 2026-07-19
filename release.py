@@ -1,59 +1,47 @@
 #!/usr/bin/env python3
-"""Publish a staged release to the feature/js-client-delivery GitHub Pages
-branch.
+"""Assemble a ready-to-publish bundle for the web branch, which GitHub Pages
+serves.
 
-This is the *only* thing that should ever write to that branch. Not every
-commit is a release -- there's exactly one path to publishing: this script,
-run once per version. Don't hand-edit files on that branch directly (see
-plan.md) -- past experience doing that by hand got a working directory's
-branch flipped out from under an in-progress edit.
+Development happens on web-dev, not web -- web is reserved for published
+release content only, kept separate so source history and publish history
+don't get mixed.
 
-It works entirely in a throwaway temp clone of feature/js-client-delivery --
-it never checks out that branch, or touches the branch you have checked out,
-in this repo's own working directory. The temp clone is deleted before the
-script exits either way.
+This script does *not* touch git at all -- no clone, no commit, no push.
+It just validates the version, finds the already-staged release/vX.Y.Z/
+files (wheel, .sha256, 3pslccacore.js, optional NOTES.md -- built by
+`python -m build --wheel -C version=X.Y.Z -C release=true`, see
+DEVELOPING.md), and assembles everything the web branch's root needs --
+index.html, a filtered release/releases.json (only entries already marked
+"published": true in the local ledger, plus the one being built now -- so
+the published page never links to a version that only ever existed
+locally), and the staged release/vX.Y.Z/ folder -- into release/_publish/
+locally. Copy that folder's *contents* onto the web branch yourself
+(checkout web, copy, `git add -A`, commit, push) -- that part is manual.
 
-It doesn't build or render anything itself -- a confirmed release build
-(`python -m build --wheel -C version=X.Y.Z -C release=true`) already has
-_build_backend.py stage the wheel, its .sha256, and a rendered
-3pslccacore.js into release/vX.Y.Z/ locally, plus record a matching entry
-in release/releases.json (all gitignored except releases.json itself, see
-DEVELOPING.md). This script copies that already-assembled folder onto the
-pages branch, alongside a filtered releases.json (only entries already
-marked "published": true, plus the one being published now -- so the
-published page never links to a version that only ever existed locally)
-and this repo's index.html (a static page that reads that releases.json;
-not templated, just copied as-is).
+After you've actually pushed, flip this version's "published" field to
+true in release/releases.json yourself, so future runs of this script
+carry it forward into the filtered payload for later releases.
 
-Usage, after a production wheel build (see DEVELOPING.md):
+Usage, after a production wheel build:
 
     python -m build --wheel -C version=1.2.0 -C release=true
-    python release.py --version 1.2.0            # commits in a temp clone, doesn't push
-    python release.py --version 1.2.0 --push      # rerun with --push once you're satisfied
-
-Without --push, nothing on origin changes -- the printed commit summary is
-your review step. Rerun with --push once you're satisfied (this re-does the
-temp clone + commit; that's cheap and deterministic for the same inputs).
-Only on a successful --push is release/releases.json's local entry for this
-version flipped to "published": true -- a dry run never touches it.
+    python release.py --version 1.2.0
+    # then: checkout web, copy release/_publish/* over it, commit, push
 """
 
 import argparse
 import json
 import pathlib
 import shutil
-import subprocess
 import sys
-import tempfile
 
 from packaging.version import InvalidVersion, Version
 
 ROOT = pathlib.Path(__file__).resolve().parent
 PACKAGE_NAME = "three_ps_lcca_core"
-PAGES_BRANCH = "feature/js-client-delivery"
-BOT_AUTHOR = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
 INDEX_HTML_FILE = ROOT / "index.html"
 RELEASES_FILE = ROOT / "release" / "releases.json"
+PUBLISH_DIR = ROOT / "release" / "_publish"
 
 
 def parse_args():
@@ -65,20 +53,11 @@ def parse_args():
         required=True,
         help="Version being released, e.g. 1.2.0 (must be a final, non-prerelease PEP 440 version).",
     )
-    parser.add_argument(
-        "--push",
-        action="store_true",
-        help="Push the release commit to origin. Without this, the commit is made and shown in a temp clone, then discarded.",
-    )
     return parser.parse_args()
 
 
 def fail(message):
     sys.exit(f"error: {message}")
-
-
-def run(cmd, **kwargs):
-    return subprocess.run(cmd, check=True, **kwargs)
 
 
 def validate_version(raw):
@@ -123,11 +102,6 @@ def find_staged_release(version):
     return wheel, sha_file, js_file, notes_file
 
 
-def origin_url():
-    result = run(["git", "-C", str(ROOT), "remote", "get-url", "origin"], capture_output=True, text=True)
-    return result.stdout.strip()
-
-
 def load_local_releases():
     if not RELEASES_FILE.is_file():
         fail(f"{RELEASES_FILE.relative_to(ROOT)} not found. Build a release first (see DEVELOPING.md).")
@@ -151,9 +125,9 @@ def find_ledger_entry(data, version):
 
 
 def published_releases_payload(data, version):
-    """The releases.json to publish: only entries already live on the pages
-    branch, plus the one being published right now -- never a version that
-    only ever existed in the local ledger."""
+    """The releases.json to publish: only entries already marked published,
+    plus the one being built right now -- never a version that only ever
+    existed in the local ledger."""
     published = [e for e in data["versions"] if e.get("kind") == "release" and e.get("published")]
     if not any(e.get("version") == str(version) for e in published):
         published.append(find_ledger_entry(data, version))
@@ -164,64 +138,37 @@ def main():
     args = parse_args()
     version = validate_version(args.version)
     wheel, sha_file, js_file, notes_file = find_staged_release(version)
-    checksum = sha_file.read_text(encoding="utf-8").split()[0]
 
     if not INDEX_HTML_FILE.is_file():
         fail(f"{INDEX_HTML_FILE.relative_to(ROOT)} not found.")
     local_data = load_local_releases()
-    entry = find_ledger_entry(local_data, version)
     pages_releases = published_releases_payload(local_data, version)
 
-    with tempfile.TemporaryDirectory(prefix="3pslcca-release-") as tmp:
-        tmp = pathlib.Path(tmp) / "clone"
-        run(
-            ["git", "clone", "--quiet", "--branch", PAGES_BRANCH, "--single-branch", origin_url(), str(tmp)]
-        )
-        branch = run(
-            ["git", "-C", str(tmp), "branch", "--show-current"], capture_output=True, text=True
-        ).stdout.strip()
-        if branch != PAGES_BRANCH:
-            fail(f"cloned branch is '{branch}', expected '{PAGES_BRANCH}'.")
+    if PUBLISH_DIR.exists():
+        shutil.rmtree(PUBLISH_DIR)
+    release_dir = PUBLISH_DIR / "release" / f"v{version}"
+    release_dir.mkdir(parents=True)
+    shutil.copy2(wheel, release_dir / wheel.name)
+    shutil.copy2(sha_file, release_dir / sha_file.name)
+    shutil.copy2(js_file, release_dir / "3pslccacore.js")
+    if notes_file:
+        shutil.copy2(notes_file, release_dir / "NOTES.md")
 
-        release_dir = tmp / "release" / f"v{version}"
-        if release_dir.exists():
-            fail(f"v{version} already exists on {PAGES_BRANCH} -- releases are immutable. Bump the version instead.")
+    (PUBLISH_DIR / "release" / "releases.json").write_text(
+        json.dumps(pages_releases, indent=2) + "\n", encoding="utf-8"
+    )
+    shutil.copy2(INDEX_HTML_FILE, PUBLISH_DIR / "index.html")
+    (PUBLISH_DIR / ".nojekyll").touch()
 
-        release_dir.mkdir(parents=True)
-        shutil.copy2(wheel, release_dir / wheel.name)
-        shutil.copy2(sha_file, release_dir / sha_file.name)
-        shutil.copy2(js_file, release_dir / "3pslccacore.js")
-        if notes_file:
-            shutil.copy2(notes_file, release_dir / "NOTES.md")
-
-        (tmp / "release" / "releases.json").write_text(
-            json.dumps(pages_releases, indent=2) + "\n", encoding="utf-8"
-        )
-        shutil.copy2(INDEX_HTML_FILE, tmp / "index.html")
-        nojekyll = tmp / ".nojekyll"
-        if not nojekyll.exists():
-            nojekyll.touch()
-
-        run(["git", "-C", str(tmp), "add", "-A"])
-        run(
-            [
-                "git", "-C", str(tmp), "commit",
-                "--author", BOT_AUTHOR,
-                "-m", f"Release v{version}",
-            ]
-        )
-
-        print(f"committed in temp clone ({wheel.name}, sha256={checksum[:12]}...):\n")
-        run(["git", "-C", str(tmp), "show", "--stat", "HEAD"])
-
-        if args.push:
-            run(["git", "-C", str(tmp), "push"])
-            print(f"\npushed v{version} to {PAGES_BRANCH} on origin.")
-            entry["published"] = True
-            RELEASES_FILE.write_text(json.dumps(local_data, indent=2) + "\n", encoding="utf-8")
-            print(f"marked v{version} as published in {RELEASES_FILE.relative_to(ROOT)}.")
-        else:
-            print(f"\nnot pushed. Review the summary above, then rerun with --push to publish v{version}.")
+    print(f"assembled at {PUBLISH_DIR.relative_to(ROOT).as_posix()}/:")
+    for p in sorted(PUBLISH_DIR.rglob("*")):
+        if p.is_file():
+            print(f"  {p.relative_to(PUBLISH_DIR).as_posix()}")
+    print(
+        f"\nNext (manual): checkout web, copy {PUBLISH_DIR.relative_to(ROOT).as_posix()}/* over its "
+        f"root, git add -A, commit, push. Afterward, set \"published\": true for {version} in "
+        f"{RELEASES_FILE.relative_to(ROOT)} yourself."
+    )
 
 
 if __name__ == "__main__":
