@@ -1,5 +1,5 @@
 {
-  "latest": "1.0.0",
+  "latest": "1.0.1",
   "versions": [
     {
       "version": "1.0.0",
@@ -12,6 +12,19 @@
       "js_sha256": "aa06b01df399ab117f4047feae9ed211e71931894eadd9cfff3718d2a55733af",
       "notes": true,
       "commit": "cb93b15bf84d6817a768c34753cf1d64784e85c1",
+      "published": true
+    },
+    {
+      "version": "1.0.1",
+      "kind": "release",
+      "timestamp": "2026-07-19T19:14:26.277821+00:00",
+      "filename": "three_ps_lcca_core-1.0.1-py3-none-any.whl",
+      "path": "release/v1.0.1",
+      "url": "https://3psLCCA.github.io/3psLCCA-core/release/v1.0.1",
+      "wheel_sha256": "b6e48e82e4dc86dd635cec20e47980ba737c719a541a4094be865f0652daad49",
+      "js_sha256": "6ebb956ec682f578233d321e63c288adf0b07fdad5ed504e3a81000b1cc668d4",
+      "notes": true,
+      "commit": "db8b6e465bb432e806e508a5e977d9cc684f2126",
       "published": false
     }
   ]
