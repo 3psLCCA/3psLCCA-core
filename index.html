@@ -439,6 +439,7 @@
       <div class="nav-links">
         <a class="active" href="./">Releases</a>
         <a href="./lcca-notebook.html">Notebook</a>
+        <a href="./view_documentation.html">Docs</a>
         <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </div>
@@ -564,9 +565,11 @@
       tr.appendChild(dateCell);
 
       const notesCell = document.createElement("td");
-      if (entry.notes && entry.url) {
+      if (entry.notes && (entry.path || entry.url)) {
         const a = document.createElement("a");
-        a.href = `${entry.url}/NOTES.md`;
+        a.href = entry.path
+          ? `./view_documentation.html#file=${encodeURIComponent(`${entry.path}/NOTES.md`)}`
+          : `${entry.url}/NOTES.md`;
         a.textContent = "Notes";
         notesCell.appendChild(a);
       } else {

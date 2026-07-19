@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3psLCCA-core — Docs</title>
+  <meta name="description"
+    content="Documentation viewer for 3psLCCA-core. Point the #file= hash at any Markdown file in the repo to render it." />
+  <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0b10;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-2: rgba(255, 255, 255, 0.055);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #e7e9ee;
+      --text-dim: #9aa1b2;
+      --text-faint: #626a7d;
+      --accent: #7c8cff;
+      --accent-2: #4dd6c1;
+      --danger: #ff6b7a;
+      --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+      --sans: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(50rem 30rem at 80% -10%, rgba(124, 140, 255, 0.13), transparent 60%),
+        radial-gradient(40rem 26rem at 5% 10%, rgba(77, 214, 193, 0.07), transparent 60%);
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.86em;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 0.1em 0.4em;
+      border-radius: 6px;
+    }
+
+    .wrap {
+      max-width: 60rem;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10, 11, 16, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      height: 3.5rem;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand:hover {
+      text-decoration: none;
+    }
+
+    .brand .logo {
+      width: 1.7rem;
+      height: 1.7rem;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .nav-links {
+      margin-left: auto;
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: var(--surface-2);
+      text-decoration: none;
+    }
+
+    .nav-links a.active {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    @media (max-width: 40rem) {
+      .wrap {
+        padding: 0 0.9rem;
+      }
+
+      .nav-inner {
+        gap: 0.6rem;
+      }
+
+      .nav-links a {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.45rem;
+      }
+
+      .brand {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (max-width: 26rem) {
+      .brand-text {
+        display: none;
+      }
+    }
+
+    .statusbar {
+      position: sticky;
+      top: 3.5rem;
+      z-index: 40;
+      background: rgba(10, 11, 16, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0;
+    }
+
+    .status-dot {
+      flex: 0 0 auto;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 8px var(--accent-2);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    .status-dot.bad {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    #status {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 550;
+      font-family: var(--mono);
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filepicker {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+
+    .filepicker label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-faint);
+    }
+
+    .filepicker input {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.3rem 0.6rem;
+      width: 11rem;
+      transition: border-color 0.15s ease;
+    }
+
+    .filepicker input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .runall {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .runall:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    main.wrap {
+      padding-top: 2rem;
+      padding-bottom: 4rem;
+    }
+
+    /* ---- doc states ---- */
+    .doc-state {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+
+    .doc-state.error {
+      border-color: rgba(255, 107, 122, 0.35);
+      background: rgba(255, 107, 122, 0.05);
+      color: var(--danger);
+    }
+
+    .doc-state .spinner {
+      display: inline-block;
+      width: 0.9rem;
+      height: 0.9rem;
+      margin-right: 0.5rem;
+      border-radius: 50%;
+      border: 2px solid var(--border-strong);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+      vertical-align: -0.15em;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ---- rendered markdown ---- */
+    .doc {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      padding: 2.25rem clamp(1.25rem, 4vw, 3rem);
+    }
+
+    .doc>*:first-child {
+      margin-top: 0;
+    }
+
+    .doc>*:last-child {
+      margin-bottom: 0;
+    }
+
+    .doc h1,
+    .doc h2,
+    .doc h3,
+    .doc h4,
+    .doc h5,
+    .doc h6 {
+      color: var(--text);
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+      scroll-margin-top: 7rem;
+    }
+
+    .doc h1 {
+      font-size: 1.7rem;
+      margin: 2.2rem 0 1rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc h2 {
+      font-size: 1.32rem;
+      margin: 2.2rem 0 0.9rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc h3 {
+      font-size: 1.08rem;
+      margin: 1.8rem 0 0.7rem;
+    }
+
+    .doc h4 {
+      font-size: 0.96rem;
+      margin: 1.5rem 0 0.6rem;
+      color: var(--text-dim);
+    }
+
+    .doc p {
+      margin: 0 0 1.05rem;
+      color: var(--text);
+    }
+
+    .doc a {
+      text-underline-offset: 0.15em;
+    }
+
+    .doc strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .doc em {
+      color: var(--text-dim);
+    }
+
+    .doc ul,
+    .doc ol {
+      margin: 0 0 1.05rem;
+      padding-left: 1.4rem;
+      color: var(--text);
+    }
+
+    .doc li {
+      margin: 0.3rem 0;
+    }
+
+    .doc li>ul,
+    .doc li>ol {
+      margin: 0.3rem 0 0.3rem;
+    }
+
+    .doc li.task-list-item {
+      list-style: none;
+      margin-left: -1.4rem;
+      padding-left: 1.4rem;
+    }
+
+    .doc input[type="checkbox"] {
+      margin-right: 0.5rem;
+      accent-color: var(--accent);
+    }
+
+    .doc blockquote {
+      margin: 0 0 1.05rem;
+      padding: 0.2rem 1rem;
+      border-left: 3px solid var(--accent);
+      background: var(--surface-2);
+      color: var(--text-dim);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .doc blockquote p:last-child {
+      margin-bottom: 0.4rem;
+    }
+
+    .doc hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.2rem 0;
+    }
+
+    .doc code {
+      font-size: 0.84em;
+    }
+
+    .doc pre {
+      margin: 0 0 1.2rem;
+      padding: 1rem 1.1rem;
+      background: #07080c;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .doc pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #b8c1d9;
+    }
+
+    .doc img {
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .doc table {
+      width: 100%;
+      margin: 0 0 1.2rem;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .doc th,
+    .doc td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+
+    .doc th {
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .doc tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .doc>h2:first-of-type,
+    .doc>h1:first-child+h2 {
+      margin-top: 1.6rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 0 2rem;
+      color: var(--text-faint);
+      font-size: 0.82rem;
+    }
+
+    .foot-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img class="logo" src="./assets/logo-3psLCCA.svg" alt="3psLCCA logo" /><span
+          class="brand-text">3psLCCA Core</span></a>
+      <div class="nav-links">
+        <a href="./">Releases</a>
+        <a href="./lcca-notebook.html">Notebook</a>
+        <a class="active" href="./view_documentation.html">Docs</a>
+        <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="statusbar">
+    <div class="wrap status-inner">
+      <span class="status-dot" id="statusDot"></span>
+      <p id="status">Loading…</p>
+      <div class="filepicker">
+        <label for="fileInput">file</label>
+        <input id="fileInput" type="text" spellcheck="false" autocomplete="off" value="README.md" />
+      </div>
+      <button id="btnReload" class="runall" type="button">↻ reload</button>
+    </div>
+  </div>
+
+  <main class="wrap" id="docRoot">
+    <div class="doc-state" id="docState"><span class="spinner"></span>Loading README.md…</div>
+    <article class="doc" id="doc" hidden></article>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <span>3psLCCA Core · in-browser Life-Cycle Cost Analysis</span>
+      <a href="https://github.com/3psLCCA/3psLCCA-core/tree/web">github.com/3psLCCA/3psLCCA-core</a>
+    </div>
+  </footer>
+
+  <script>
+    const DEFAULT_FILE = "README.md";
+
+    const statusEl = document.getElementById("status");
+    const statusDot = document.getElementById("statusDot");
+    const stateEl = document.getElementById("docState");
+    const docEl = document.getElementById("doc");
+    const fileInput = document.getElementById("fileInput");
+
+    function currentFile() {
+      const m = /(?:^|[#&])file=([^&]+)/.exec(location.hash);
+      const raw = m ? decodeURIComponent(m[1]) : DEFAULT_FILE;
+      // Keep this a same-directory relative path — no protocol, no leading slash, no "..".
+      return raw.replace(/^([a-z]+:)?\/*/i, "").replace(/\.\.\/?/g, "") || DEFAULT_FILE;
+    }
+
+    function setHashFile(file) {
+      location.hash = `file=${encodeURIComponent(file)}`;
+    }
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text;
+      statusDot.className = "status-dot" + (isError ? " bad" : "");
+    }
+
+    function showLoading(file) {
+      docEl.hidden = true;
+      stateEl.hidden = false;
+      stateEl.className = "doc-state";
+      stateEl.innerHTML = `<span class="spinner"></span>Loading ${file}…`;
+      setStatus(`Loading ${file}…`);
+    }
+
+    function showError(file, detail) {
+      docEl.hidden = true;
+      stateEl.hidden = false;
+      stateEl.className = "doc-state error";
+      stateEl.textContent = `Couldn't load "${file}": ${detail}`;
+      setStatus(`Failed to load ${file}`, true);
+    }
+
+    function showDoc(html, file) {
+      stateEl.hidden = true;
+      docEl.hidden = false;
+      docEl.innerHTML = html;
+      setStatus(`Loaded ${file}`);
+    }
+
+    async function loadFile(file) {
+      fileInput.value = file;
+      showLoading(file);
+      try {
+        const res = await fetch(file, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const md = await res.text();
+        const html = window.marked
+          ? marked.parse(md, { gfm: true, breaks: false })
+          : `<pre>${md.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))}</pre>`;
+        showDoc(html, file);
+        document.title = `${file} — 3psLCCA-core Docs`;
+      } catch (e) {
+        showError(file, e.message || String(e));
+      }
+    }
+
+    fileInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        setHashFile(fileInput.value.trim() || DEFAULT_FILE);
+      }
+    });
+
+    document.getElementById("btnReload").addEventListener("click", () => loadFile(currentFile()));
+
+    window.addEventListener("hashchange", () => loadFile(currentFile()));
+
+    loadFile(currentFile());
+  </script>
+
+</body>
+
+</html>

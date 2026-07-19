@@ -1,27 +1,42 @@
 # 3psLCCA Core
 
-Python package for performing **Life Cycle Cost Analysis (LCCA)** on bridge structures, with support for road user cost, carbon emission cost, maintenance, and end-of-life stage costs.
+Python package for performing **Life Cycle Cost Analysis (LCCA)** on bridge structures, with support for road user cost, carbon emission cost, maintenance, and end-of-life stage costs — and a browser build that runs the same engine entirely client-side via [Pyodide](https://pyodide.org) (WebAssembly).
 
-## Installation
+This is the **`web` branch**: the branch GitHub Pages serves. Besides the Python source, it carries the published release artifacts and the site around them.
 
-```bash
-pip install git+https://github.com/swas02/3psLCCA-core.git@main
+## Live site
+
+| Page | What it does |
+| --- | --- |
+| [Releases](https://3psLCCA.github.io/3psLCCA-core/) | All published versions of `3pslccacore.js`, with drop-in snippets and integrity hashes |
+| [Notebook](https://3psLCCA.github.io/3psLCCA-core/lcca-notebook.html) | Interactive in-browser LCCA notebook |
+| [Docs](https://3psLCCA.github.io/3psLCCA-core/view_documentation.html) | Renders any Markdown file from this branch (`#file=release/v1.0.0/NOTES.md`, etc.) |
+
+## Use in the browser
+
+One script tag per release — the wheel URL is baked in, no server or install needed:
+
+```html
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"></script>
+<script>
+  const { sample, performAnalysis } = window.ThreePsLccaCore;
+  performAnalysis(sample.input, sample.constructionCosts, sample.wpi)
+    .then((result) => console.log(result));
+</script>
 ```
 
-Or a specific release:
+See each release's `NOTES.md` (linked from the releases page) for the full `window.ThreePsLccaCore` API.
 
-```bash
-pip install git+https://github.com/swas02/3psLCCA-core.git@v1.0.0
-```
+## What's on this branch
 
-## Requirements
+| Path | Purpose |
+| --- | --- |
+| `index.html`, `lcca-notebook.html`, `view_documentation.html` | The GitHub Pages site |
+| `release/releases.json` | Machine-readable release index (drives the releases page) |
+| `release/vX.Y.Z/` | Published artifacts per version: `3pslccacore.js`, wheel + `.sha256`, `NOTES.md` |
+| `3pslccacore.template.js` | Template the release build renders into each version's `3pslccacore.js` |
+| `release.py`, `verify_releases.py`, `_build_backend.py` | Release tooling: build the wheel, assemble the bundle, publish it here |
+| `src/` | The Python package (`three_ps_lcca_core`) and examples |
 
-- Python >= 3.12
-
-## Usage
-
-```python
-from three_ps_lcca_core.core.main import run_full_lcc_analysis
-```
-
-See `src/examples/` for complete input examples.
+Development happens on the `web-dev` branch; releases are built there (`python -m build --wheel -C version=X.Y.Z -C release=true`) and `release.py` copies the assembled `release/vX.Y.Z/` folder onto this branch.

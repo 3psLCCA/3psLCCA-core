@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>3psLCCA-core — JS Notebook</title>
+  <title>3psLCCA-core - JS Notebook</title>
   <meta name="description"
-    content="An editable JavaScript notebook for 3pslccacore.js — tweak the inputs, run each cell, and watch the LCCA output change." />
+    content="An editable JavaScript notebook for 3pslccacore.js - tweak the inputs, run each cell, and watch the LCCA output change." />
   <link rel="icon" type="image/svg+xml" href="./assets/logo-3psLCCA.svg" />
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
   <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.0/3pslccacore.js"
@@ -518,7 +518,7 @@
       <h1>JS notebook</h1>
       <p class="lead">
         Each cell below is real, editable JavaScript running against <code>3pslccacore.js</code>.
-        Change anything — especially the inputs in cell 04 — then press <kbd>Shift</kbd>+<kbd>Enter</kbd>
+        Change anything - especially the inputs in cell 04 - then press <kbd>Shift</kbd>+<kbd>Enter</kbd>
         (or the run button) to execute a cell. Cells share state through the <code>nb</code> object,
         and <code>display(value)</code> prints into the cell's output.
       </p>
@@ -547,9 +547,9 @@
     const CELLS = [
       {
         title: "Check the environment",
-        desc: "No input needed — verifies WebAssembly and that the release wheel is reachable, without booting Python.",
+        desc: "No input needed - verifies WebAssembly and that the release wheel is reachable, without booting Python.",
         code: `const problems = await checkEnvironment();
-display(problems.length ? problems : "No problems detected — environment looks usable.");`,
+display(problems.length ? problems : "No problems detected - environment looks usable.");`,
       },
       {
         title: "Initialize the Python runtime",
@@ -567,9 +567,9 @@ display(getState());`,
 display(suggestions);`,
       },
       {
-        title: "Prepare your input — edit me!",
+        title: "Prepare your input - edit me!",
         desc: "Clones the bundled sample input so you can tweak values. Change the numbers, re-run this cell, then re-run cell 05 and compare outputs.",
-        code: `// arg 1 — the analysis input (cloned so the original sample stays intact)
+        code: `// arg 1 - the analysis input (cloned so the original sample stays intact)
 nb.input = structuredClone(sample.input);
 
 // try changing these ↓
@@ -577,7 +577,7 @@ nb.input.general_parameters.discount_rate_percent = 6.7;
 nb.input.general_parameters.analysis_period_years = 100;
 nb.input.traffic_and_road_data.vehicle_data.small_cars.vehicles_per_day = 7271;
 
-// args 2 & 3 — construction costs and WPI escalation factors
+// args 2 & 3 - construction costs and WPI escalation factors
 nb.constructionCosts = structuredClone(sample.constructionCosts);
 nb.wpi = structuredClone(sample.wpi);
 
