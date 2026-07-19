@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>3psLCCA Core — releases</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; }
+  code { background: #f5f5f5; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+  pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 0.75rem; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-weight: 600; color: #555; }
+  tr.prerelease td { color: #888; }
+  .badge { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef; color: #335; }
+  .badge.latest { background: #dff0d8; color: #2a5; }
+  .badge.unpublished { background: #f5f0e0; color: #a70; }
+  .sha { color: #888; }
+  #status { color: #888; }
+  #status.error { color: #b00020; }
+</style>
+</head>
+<body>
+
+<h1>3psLCCA Core — releases</h1>
+<p>
+  This page reads <code>release/releases.json</code> and lists every
+  <code>3pslccacore.js</code> published for browser/Pyodide use -- that's
+  the one file you need to <code>&lt;script src&gt;</code>; it already
+  points at its own matching wheel internally. See
+  <a href="https://github.com/3psLCCA/3psLCCA-core/blob/web/DEVELOPING.md">DEVELOPING.md</a>
+  on the <code>web</code> branch for how a release is built and published
+  (<code>_build_backend.py</code> stages it locally, <code>release.py</code>
+  publishes it here).
+</p>
+
+<h2>Latest</h2>
+<p id="status">Loading release/releases.json…</p>
+<pre id="latestSnippet" hidden><code></code></pre>
+
+<h2>All releases</h2>
+<table id="table" hidden>
+  <thead>
+    <tr>
+      <th>Version</th>
+      <th>Date</th>
+      <th>Notes</th>
+      <th>3pslccacore.js</th>
+      <th>sha256</th>
+      <th>Commit</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  const statusEl = document.getElementById("status");
+  const snippetEl = document.getElementById("latestSnippet");
+  const tableEl = document.getElementById("table");
+  const tbodyEl = tableEl.querySelector("tbody");
+
+  function shortSha(sha) {
+    return sha ? sha.slice(0, 12) : "—";
+  }
+
+  // Subresource Integrity needs a base64 digest, not the hex sha256 stored
+  // in releases.json.
+  function hexToBase64(hex) {
+    const bytes = hex.match(/.{2}/g).map((b) => parseInt(b, 16));
+    return btoa(String.fromCharCode(...bytes));
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    return iso.slice(0, 10);
+  }
+
+  function renderRow(entry, isLatest) {
+    const tr = document.createElement("tr");
+    if (entry.kind === "prerelease") tr.className = "prerelease";
+
+    const versionCell = document.createElement("td");
+    versionCell.textContent = entry.version;
+    if (isLatest) {
+      const badge = document.createElement("span");
+      badge.className = "badge latest";
+      badge.textContent = "latest";
+      badge.style.marginLeft = "0.5rem";
+      versionCell.appendChild(badge);
+    } else if (entry.kind === "prerelease") {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = "prerelease";
+      badge.style.marginLeft = "0.5rem";
+      versionCell.appendChild(badge);
+    }
+    tr.appendChild(versionCell);
+
+    const dateCell = document.createElement("td");
+    dateCell.textContent = formatDate(entry.timestamp);
+    tr.appendChild(dateCell);
+
+    const notesCell = document.createElement("td");
+    if (entry.notes && entry.url) {
+      const a = document.createElement("a");
+      a.href = `${entry.url}/NOTES.md`;
+      a.textContent = "Notes";
+      notesCell.appendChild(a);
+    } else {
+      notesCell.textContent = "—";
+    }
+    tr.appendChild(notesCell);
+
+    const scriptCell = document.createElement("td");
+    if (entry.url) {
+      const a = document.createElement("a");
+      a.href = `${entry.url}/3pslccacore.js`;
+      a.textContent = "3pslccacore.js";
+      scriptCell.appendChild(a);
+    } else {
+      scriptCell.textContent = "3pslccacore.js";
+      const badge = document.createElement("span");
+      badge.className = "badge unpublished";
+      badge.textContent = "not published";
+      badge.style.marginLeft = "0.5rem";
+      scriptCell.appendChild(badge);
+    }
+    tr.appendChild(scriptCell);
+
+    const shaCell = document.createElement("td");
+    shaCell.className = "sha";
+    shaCell.textContent = shortSha(entry.js_sha256);
+    tr.appendChild(shaCell);
+
+    const commitCell = document.createElement("td");
+    commitCell.className = "sha";
+    commitCell.textContent = shortSha(entry.commit);
+    tr.appendChild(commitCell);
+
+    return tr;
+  }
+
+  fetch("./release/releases.json")
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then((data) => {
+      const versions = data.versions || [];
+      if (versions.length === 0) {
+        statusEl.textContent = "Nothing has been published yet.";
+        return;
+      }
+
+      const latestEntry = versions.find((e) => e.version === data.latest);
+      if (latestEntry && latestEntry.url) {
+        statusEl.textContent = `v${latestEntry.version} — ${latestEntry.url}`;
+        snippetEl.hidden = false;
+        const integrityAttr = latestEntry.js_sha256
+          ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
+          : "";
+        snippetEl.querySelector("code").textContent =
+`<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script>
+<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+      } else if (data.latest) {
+        statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;
+        statusEl.className = "error";
+      } else {
+        statusEl.textContent = "No release is marked latest yet.";
+      }
+
+      const sorted = [...versions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+      for (const entry of sorted) {
+        tbodyEl.appendChild(renderRow(entry, entry.version === data.latest));
+      }
+      tableEl.hidden = false;
+    })
+    .catch((err) => {
+      statusEl.textContent = `Could not load release/releases.json (${err}).`;
+      statusEl.className = "error";
+    });
+</script>
+
+</body>
+</html>

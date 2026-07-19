@@ -1,29 +1,30 @@
 [build-system]
 requires = [
-    "setuptools >= 61.0",   # required for PEP 660 support - builds the package.
-    "setuptools_scm >= 8.0" # required for PEP 621 support - manages the version number based on git tags.
+    "setuptools >= 61.0", # required for PEP 660 support - builds the package.
+    "packaging >= 21.0"   # used by _build_backend.py to validate -C version=X.Y.Z
 ]
-build-backend = "setuptools.build_meta" # Use setuptools as the engine to build this package.
-include-package-data = true # This ensures that non-code files specified in MANIFEST.in are included in the package distribution.
+build-backend = "_build_backend" # Wraps setuptools.build_meta to require -C version=X.Y.Z.
+backend-path = ["."]
 
 [tool.setuptools.packages.find]
-namespaces = true
 where = ["src"]
+include = ["three_ps_lcca_core*"] # Exclude src/examples from the distributed wheel.
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"} # Written by _build_backend.py from -C version=X.Y.Z; not tracked in git.
 
 
 [project]
 name = "three_ps_lcca_core"
-dynamic = ["version"]   # The version will be determined by setuptools_scm based on git tags.
+dynamic = ["version"]   # Read from ./VERSION; see DEVELOPING.md for how to build.
 dependencies = []
 requires-python = ">= 3.12"
 
-description = "A Python package for performing life cycle cost analysis (LCCA) on three primary steel design options: hot-rolled, cold-formed, and built-up steel sections. This package provides tools and functions to evaluate the economic performance of these steel design options over their entire life cycle, including initial costs, maintenance costs, and end-of-life costs. It is designed to assist engineers and decision-makers in selecting the most cost-effective steel design option for their projects."
+description = "A Python module for performing Life Cycle Cost Analysis (LCCA) on bridge structures, covering road user cost (vehicle operation, value of time, congestion, accident, and carbon emission costs) and stage costs (initial, maintenance, reconstruction, and end-of-life)."
 
 authors = [
     {name = "Osdag", email = "osdag@fossee.in"}
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
-keywords = ["steel design", "life cycle analysis", "engineering"]
-
-[project.scripts]
+keywords = ["life cycle cost analysis", "road user cost", "bridge engineering"]
