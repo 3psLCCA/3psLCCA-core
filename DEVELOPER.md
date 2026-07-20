@@ -135,25 +135,37 @@ ledger, not an artifact.
 ## Publishing a release
 
 Once you have a production wheel (`-C release=true` on a final version, so
-`release/vX.Y.Z/` is staged), run `release.py` as a pre-publish check. It
+`release/vX.Y.Z/` is staged), run `release.py` as the pre-publish step. It
 does **not** touch git — no clone, no commit, no push. It validates the
-version (final releases only) and checks the staged files against the
-ledger entry. (It also assembles a `release/_publish/` bundle; that folder
-is gitignored and disposable — everything lives in `release/` itself.)
+version (final releases only), checks the staged files against the ledger
+entry, and assembles everything the `web` branch's root needs into
+`release/_publish/`: the staged `release/vX.Y.Z/` folder, a *filtered*
+`release/releases.json` (only entries already marked `"published": true`,
+plus the version being released now, so the published page never links to
+a version that only ever existed locally), `index.html`, and `.nojekyll`.
+That folder is gitignored and disposable — regenerate it anytime by
+rerunning `release.py`.
 
-```bash
-python -m build --wheel -C version=1.2.0 -C release=true
-python release.py --version 1.2.0
-```
+1. Fill in `release/vX.Y.Z/NOTES.md` first, if you want notes included —
+   `release.py` just copies whatever's on disk when it runs, so notes added
+   afterward won't make it into the bundle.
+2. Build and run the pre-publish check:
 
-Then publish manually:
+   ```bash
+   python -m build --wheel -C version=1.2.0 -C release=true
+   python release.py --version 1.2.0
+   ```
 
-1. Fill in `release/vX.Y.Z/NOTES.md` if you scaffolded one.
-2. On `web`, commit the release in place: `release/vX.Y.Z/` and the updated
-   `release/releases.json` (plus `index.html` if it changed).
-3. Push.
-4. Set `"published": true` for that version in `release/releases.json`, so
-   the ledger records it as actually live.
+3. Checkout `web`, copy the *contents* of `release/_publish/` over its root
+   (`release/vX.Y.Z/`, `release/releases.json`, `index.html`, `.nojekyll`),
+   `git add -A`, commit, and push.
+4. Set `"published": true` for that version in `web`'s
+   `release/releases.json`, commit, and push again — so the ledger records
+   it as actually live.
+5. Back on `web-dev`, set the same version's `"published": true` in the
+   local `release/releases.json` and commit it there too. `web-dev`'s
+   ledger is the master record of every build, published or not — skipping
+   this step is how the two ledgers drift out of agreement.
 
 Published releases are immutable: don't hand-edit files on `web`, and bump
 the version instead of restaging one that's already recorded (the build
