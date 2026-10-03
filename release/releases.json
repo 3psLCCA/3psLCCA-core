@@ -1,5 +1,5 @@
 {
-  "latest": "1.0.2",
+  "latest": "1.0.3",
   "versions": [
     {
       "version": "1.0.0",
@@ -41,6 +41,21 @@
       "notes": true,
       "pyodide_url": "https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.js",
       "commit": "0960535d9cdd2eb14838afc743bca3d01671aab4",
+      "published": true
+    },
+    {
+      "version": "1.0.3",
+      "kind": "release",
+      "timestamp": "2026-10-03T14:17:27.550463+00:00",
+      "filename": "three_ps_lcca_core-1.0.3-py3-none-any.whl",
+      "path": "release/v1.0.3",
+      "url": "https://3psLCCA.github.io/3psLCCA-core/release/v1.0.3",
+      "wheel_sha256": "fda23697524bee51e8d6d4caa59acff1b28ef9b2e32369ee9120d1cd5985edd1",
+      "js_sha256": "67401a8f9458aa42eb1ad762baa93aef5d442a0443fa87a78124a663123a6e4d",
+      "brython_bundle": "three_ps_lcca_core.brython.js",
+      "brython_sha256": "adc7b7fabb65f4b1989d81910749d4d8927237d2c3d9f466da7cf4ca061c2697",
+      "notes": true,
+      "commit": "b6c5d065bf60093ff5fcce2b30d45477be79d71b",
       "published": true
     }
   ]

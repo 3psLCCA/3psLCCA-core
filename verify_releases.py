@@ -80,6 +80,9 @@ def main():
                    entry.get("wheel_sha256"), counters, mismatches)
             _check(f"{version} (staged 3pslccacore.js)", release_dir / "3pslccacore.js",
                    entry.get("js_sha256"), counters, mismatches)
+            if entry.get("brython_bundle"):
+                _check(f"{version} (staged {entry['brython_bundle']})", release_dir / entry["brython_bundle"],
+                       entry.get("brython_sha256"), counters, mismatches)
 
     print(f"\nchecked {counters['checked']}, skipped {counters['skipped']} (not present locally)")
     if mismatches:

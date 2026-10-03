@@ -298,12 +298,20 @@
     <h2>Latest release</h2>
     <p id="status">Loading release/releases.json…</p>
 
-    <div class="snippet" id="snippetCard" hidden>
+    <div class="snippet" id="snippetCardBrython" hidden style="margin-bottom: 1.25rem;">
       <div class="snippet-head">
-        <span>drop-in snippet</span>
-        <button id="copyBtn" class="copy-btn" type="button">copy</button>
+        <span>Option 1: Brython Target (Recommended · 93 KB bundle · ~5 ms)</span>
+        <button id="copyBtnBrython" class="copy-btn" type="button">copy</button>
       </div>
-      <pre id="latestSnippet" hidden><code></code></pre>
+      <pre id="latestSnippetBrython" hidden><code></code></pre>
+    </div>
+
+    <div class="snippet" id="snippetCardPyodide" hidden>
+      <div class="snippet-head">
+        <span>Option 2: Pyodide Target (WebAssembly · 7 MB runtime)</span>
+        <button id="copyBtnPyodide" class="copy-btn" type="button">copy</button>
+      </div>
+      <pre id="latestSnippetPyodide" hidden><code></code></pre>
     </div>
     <p class="muted" id="snippetNote" hidden>
       Quick start, options, and integrity hashes are in this release's
@@ -318,8 +326,8 @@
             <th>Version</th>
             <th>Date</th>
             <th>Notes</th>
-            <th>3pslccacore.js</th>
-            <th>sha256</th>
+            <th>Pyodide Wrapper</th>
+            <th>Brython Bundle (93 KB)</th>
             <th>Commit</th>
           </tr>
         </thead>
@@ -349,23 +357,32 @@
 
   <script>
     const statusEl = document.getElementById("status");
-    const snippetEl = document.getElementById("latestSnippet");
-    const snippetCard = document.getElementById("snippetCard");
+    const snippetCardBrython = document.getElementById("snippetCardBrython");
+    const snippetElBrython = document.getElementById("latestSnippetBrython");
+    const copyBtnBrython = document.getElementById("copyBtnBrython");
+    const snippetCardPyodide = document.getElementById("snippetCardPyodide");
+    const snippetElPyodide = document.getElementById("latestSnippetPyodide");
+    const copyBtnPyodide = document.getElementById("copyBtnPyodide");
     const tableEl = document.getElementById("table");
     const tbodyEl = tableEl.querySelector("tbody");
     const latestBadge = document.getElementById("latestBadge");
-    const copyBtn = document.getElementById("copyBtn");
 
-    copyBtn.addEventListener("click", () => {
-      navigator.clipboard.writeText(snippetEl.textContent).then(() => {
-        copyBtn.textContent = "copied ✓";
-        copyBtn.classList.add("done");
-        setTimeout(() => {
-          copyBtn.textContent = "copy";
-          copyBtn.classList.remove("done");
-        }, 1500);
+    function wireCopyBtn(btn, targetEl) {
+      if (!btn || !targetEl) return;
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(targetEl.textContent).then(() => {
+          btn.textContent = "copied ✓";
+          btn.classList.add("done");
+          setTimeout(() => {
+            btn.textContent = "copy";
+            btn.classList.remove("done");
+          }, 1500);
+        });
       });
-    });
+    }
+
+    wireCopyBtn(copyBtnBrython, snippetElBrython);
+    wireCopyBtn(copyBtnPyodide, snippetElPyodide);
 
     function shortSha(sha) {
       return sha ? sha.slice(0, 12) : "—";
@@ -434,10 +451,18 @@
       }
       tr.appendChild(scriptCell);
 
-      const shaCell = document.createElement("td");
-      shaCell.className = "sha";
-      shaCell.textContent = shortSha(entry.js_sha256);
-      tr.appendChild(shaCell);
+      const brythonCell = document.createElement("td");
+      if (entry.brython_bundle && entry.url) {
+        const a = document.createElement("a");
+        a.href = `${entry.url}/${entry.brython_bundle}`;
+        a.textContent = entry.brython_bundle;
+        brythonCell.appendChild(a);
+      } else if (entry.brython_bundle) {
+        brythonCell.textContent = entry.brython_bundle;
+      } else {
+        brythonCell.textContent = "—";
+      }
+      tr.appendChild(brythonCell);
 
       const commitCell = document.createElement("td");
       commitCell.className = "sha";
@@ -466,13 +491,22 @@
         if (latestEntry && latestEntry.url) {
           statusEl.textContent = `v${latestEntry.version} — ${latestEntry.url}`;
           statusEl.className = "ok";
-          snippetCard.hidden = false;
-          snippetEl.hidden = false;
-          const integrityAttr = latestEntry.js_sha256
-            ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
-            : "";
-          snippetEl.querySelector("code").textContent =
-            `<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+          if (latestEntry.brython_bundle && snippetCardBrython && snippetElBrython) {
+            snippetCardBrython.hidden = false;
+            snippetElBrython.hidden = false;
+            const brythonSnippet = `<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython_stdlib.js"><\/script>\n<script src="${latestEntry.url}/${latestEntry.brython_bundle}"><\/script>`;
+            snippetElBrython.querySelector("code").textContent = brythonSnippet;
+          }
+
+          if (snippetCardPyodide && snippetElPyodide) {
+            snippetCardPyodide.hidden = false;
+            snippetElPyodide.hidden = false;
+            const integrityAttr = latestEntry.js_sha256
+              ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
+              : "";
+            const pyodideSnippet = `<script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+            snippetElPyodide.querySelector("code").textContent = pyodideSnippet;
+          }
           if (latestEntry.notes && latestEntry.path) {
             const note = document.getElementById("snippetNote");
             note.hidden = false;
