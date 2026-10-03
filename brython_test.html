@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3psLCCA Core — Brython Auto-Run Benchmark</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 920px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      color: #222;
+      background: #fafafa;
+      line-height: 1.6;
+    }
+    h1 { margin-bottom: 0.25rem; font-size: 1.7rem; }
+    .subtitle { color: #555; margin-top: 0; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .callout {
+      background: #eef5fc;
+      border-left: 4px solid #2196f3;
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: #dff0d8;
+      color: #2a5;
+      font-weight: 600;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    .metric-box {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      text-align: center;
+    }
+    .metric-label {
+      font-size: 0.8rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.35rem;
+    }
+    .metric-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0066cc;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .metric-val.warm {
+      color: #28a745;
+    }
+    .btn-group { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    button {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    button:hover { background: #0052a3; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    #status {
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 0.75rem;
+    }
+    .status-idle { background: #eee; color: #555; }
+    .status-running { background: #fff3cd; color: #856404; }
+    .status-success { background: #d4edda; color: #155724; }
+    .status-error { background: #f8d7da; color: #721c24; }
+    pre {
+      background: #272822;
+      color: #f8f8f2;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      font-family: ui-monospace, Consolas, monospace;
+      max-height: 450px;
+    }
+    code { font-family: ui-monospace, Consolas, monospace; }
+  </style>
+
+  <script>
+    // Record page start timestamp for end-to-end timing
+    window.pageStartTime = performance.now();
+  </script>
+
+  <!-- Load Brython Engine and Standard Library (3.14.3) -->
+  <script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython_stdlib.js"></script>
+  <!-- Production minified Brython package (94 KB raw, 23 KB Gzip) -->
+  <script src="three_ps_lcca_core.brython.js"></script>
+</head>
+<body onload="brython({debug: 0})">
+
+  <h1>3psLCCA Core — Auto-Run Benchmark <span class="badge">Production (94 KB)</span></h1>
+  <p class="subtitle">Measures bundle load time, Python-to-JS transpilation, cold execution, and warm execution.</p>
+
+  <div class="card">
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <div class="metric-label">1. Module Import / Compile</div>
+        <div id="m-import" class="metric-val">Measuring...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">2. First Run (Cold)</div>
+        <div id="m-cold" class="metric-val">Measuring...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">3. Repeat Run (Warm)</div>
+        <div id="m-warm" class="metric-val warm">Measuring...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">4. Total Load + Run</div>
+        <div id="m-total" class="metric-val">Measuring...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">5. RAM (JS Heap)</div>
+        <div id="m-ram" class="metric-val">Measuring...</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <span id="status" class="status-running">Status: Auto-running analysis...</span>
+        <span id="timer" style="color: #666; font-size: 0.85rem; margin-left: 0.5rem;"></span>
+      </div>
+      <button id="btn-copy-stats" style="background: #28a745;">📋 Copy Benchmark Stats</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="btn-group">
+      <button id="btn-re-run">⚡ Re-Run LCCA Analysis</button>
+      <button id="btn-irc">Test IRC Suggestions</button>
+      <button id="btn-detailed">Run Detailed RUC</button>
+      <button id="btn-clear" style="background: #6c757d;">Clear Output</button>
+    </div>
+
+    <pre id="output">Output will appear here...</pre>
+  </div>
+
+  <!-- Brython Execution Script with Automatic Benchmark -->
+  <script type="text/python">
+import sys
+import time
+import json
+from browser import document, bind, window
+
+def set_status(text, state_class="status-running"):
+    el = document["status"]
+    el.text = f"Status: {text}"
+    el.className = state_class
+
+def format_json(obj):
+    return json.dumps(obj, indent=2)
+
+sample_input_global = {
+    "general_parameters": {
+        "service_life_years": 75,
+        "analysis_period_years": 150,
+        "discount_rate_percent": 6.7,
+        "inflation_rate_percent": 5.15,
+        "interest_rate_percent": 7.75,
+        "investment_ratio": 0.5,
+        "social_cost_of_carbon_per_mtco2e": 86.4,
+        "currency_conversion": 88.73,
+        "construction_period_months": 5.2,
+        "working_days_per_month": 26,
+        "days_per_month": 30,
+        "use_global_road_user_calculations": True,
+    },
+    "daily_road_user_cost_with_vehicular_emissions": {
+        "total_daily_ruc": 128618.886,
+        "total_carbon_emission": {
+            "total_emission_kgCO2e": 772.24519225,
+        },
+    },
+    "maintenance_and_stage_parameters": {
+        "use_stage_cost": {
+            "routine": {
+                "inspection": {"percentage_of_initial_construction_cost_per_year": 0.1, "interval_in_years": 1},
+                "maintenance": {"percentage_of_initial_construction_cost_per_year": 0.55, "percentage_of_initial_carbon_emission_cost": 0.55, "interval_in_years": 5},
+            },
+            "major": {
+                "inspection": {"percentage_of_initial_construction_cost": 0.5, "interval_for_repair_and_rehabitation_in_years": 5},
+                "repair": {"percentage_of_initial_construction_cost": 10, "percentage_of_initial_carbon_emission_cost": 0.55, "interval_for_repair_and_rehabitation_in_years": 60, "repairs_duration_months": 3},
+            },
+            "replacement_costs_for_bearing_and_expansion_joint": {
+                "percentage_of_super_structure_cost": 12.5,
+                "interval_of_replacement_in_years": 25,
+                "duration_of_replacement_in_days": 2,
+            },
+        },
+        "end_of_life_stage_costs": {
+            "demolition_and_disposal": {"percentage_of_initial_construction_cost": 10, "percentage_of_initial_carbon_emission_cost": 10, "duration_for_demolition_and_disposal_in_months": 1},
+        },
+    },
+}
+
+sample_construction_costs = {
+    "initial_construction_cost": 12843979.44,
+    "initial_carbon_emissions_cost": 2065434.91,
+    "superstructure_construction_cost": 9356038.92,
+    "total_scrap_value": 2164095.02,
+}
+
+sample_detailed_input = {
+    "general_parameters": {
+        "service_life_years": 150,
+        "analysis_period_years": 100,
+        "discount_rate_percent": 6.7,
+        "inflation_rate_percent": 5.15,
+        "interest_rate_percent": 7.75,
+        "investment_ratio": 0.5,
+        "social_cost_of_carbon_per_mtco2e": 86.4,
+        "currency_conversion": 88.73,
+        "construction_period_months": 1 / 30,
+        "working_days_per_month": 26,
+        "days_per_month": 30,
+        "use_global_road_user_calculations": False,
+    },
+    "traffic_and_road_data": {
+        "vehicle_data": {
+            "small_cars": {"vehicles_per_day": 7271, "carbon_emissions_kgCO2e_per_km": 0.103, "accident_percentage": 12.18},
+            "big_cars": {"vehicles_per_day": 7269, "carbon_emissions_kgCO2e_per_km": 0.269, "accident_percentage": 11.75},
+            "two_wheelers": {"vehicles_per_day": 3409, "carbon_emissions_kgCO2e_per_km": 0.0351, "accident_percentage": 74.61},
+            "o_buses": {"vehicles_per_day": 2, "carbon_emissions_kgCO2e_per_km": 0.45483, "accident_percentage": 0.88},
+            "d_buses": {"vehicles_per_day": 480, "carbon_emissions_kgCO2e_per_km": 0.60644, "accident_percentage": 0},
+            "lcv": {"vehicles_per_day": 564, "carbon_emissions_kgCO2e_per_km": 0.307, "accident_percentage": 0},
+            "mcv": {"vehicles_per_day": 0, "carbon_emissions_kgCO2e_per_km": 0.7375, "accident_percentage": 0, "pwr": 8},
+            "hcv": {"vehicles_per_day": 40, "carbon_emissions_kgCO2e_per_km": 0.5928, "accident_percentage": 0.59, "pwr": 7.22},
+        },
+        "accident_severity_distribution": {"minor": 25.7, "major": 61.42, "fatal": 12.88},
+        "additional_inputs": {
+            "alternate_road_carriageway": "2L",
+            "carriage_width_in_m": 8,
+            "road_roughness_mm_per_km": 2000,
+            "road_rise_m_per_km": 0,
+            "road_fall_m_per_km": 0,
+            "additional_reroute_distance_km": 0.175,
+            "additional_travel_time_min": 0.525,
+            "crash_rate_accidents_per_million_km": 3385.23,
+            "work_zone_multiplier": 1.0,
+            "peak_hour_traffic_percent_per_hour": [0.1, 0.1],
+            "hourly_capacity": 1900,
+            "force_free_flow_off_peak": True,
+        },
+    },
+    "maintenance_and_stage_parameters": {
+        "use_stage_cost": {
+            "routine": {
+                "inspection": {"percentage_of_initial_construction_cost_per_year": 0.1, "interval_in_years": 1},
+                "maintenance": {"percentage_of_initial_construction_cost_per_year": 0.55, "percentage_of_initial_carbon_emission_cost": 0.55, "interval_in_years": 5},
+            },
+            "major": {
+                "inspection": {"percentage_of_initial_construction_cost": 0.5, "interval_for_repair_and_rehabitation_in_years": 5},
+                "repair": {"percentage_of_initial_construction_cost": 10, "percentage_of_initial_carbon_emission_cost": 0.55, "interval_for_repair_and_rehabitation_in_years": 60, "repairs_duration_months": 3},
+            },
+            "replacement_costs_for_bearing_and_expansion_joint": {
+                "percentage_of_super_structure_cost": 12.5,
+                "interval_of_replacement_in_years": 25,
+                "duration_of_replacement_in_days": 2,
+            },
+        },
+        "end_of_life_stage_costs": {
+            "demolition_and_disposal": {"percentage_of_initial_construction_cost": 10, "percentage_of_initial_carbon_emission_cost": 10, "duration_for_demolition_and_disposal_in_months": 1},
+        },
+    },
+}
+
+sample_detailed_wpi = {
+    "year": 2024,
+    "WPI": {v: {
+        "petrol": 1.72096, "diesel": 1.71028, "engine_oil": 1.44970, "other_oil": 1.62951,
+        "grease": 1.62951, "property_damage": 1.14859, "tyre_cost": 1.12661, "spare_parts": 1.14125,
+        "fixed_depreciation": 1.14640, "commodity_holding_cost": 1.44130, "passenger_cost": 1.27830,
+        "crew_cost": 1.27830, "fatal": 1.10551, "major": 1.10551, "minor": 1.10551, "vot_cost": 1.27830
+    } for v in ["small_cars", "big_cars", "two_wheelers", "o_buses", "d_buses", "lcv", "hcv", "mcv"]}
+}
+
+def get_ram_stats():
+    if hasattr(window, "performance") and hasattr(window.performance, "memory"):
+        mem = window.performance.memory
+        used_mb = mem.usedJSHeapSize / (1024 * 1024)
+        total_mb = mem.totalJSHeapSize / (1024 * 1024)
+        return f"{used_mb:.1f} MB / {total_mb:.1f} MB"
+    return "N/A"
+
+# ============================================================
+# AUTO-RUN BENCHMARK SUITE
+# ============================================================
+def auto_run_benchmark():
+    try:
+        # Phase 1: Measure Import & Transpilation Time
+        t0 = time.perf_counter()
+        from three_ps_lcca_core.core.main import run_full_lcc_analysis, get_IRC_standard_suggestions
+        t_import = (time.perf_counter() - t0) * 1000
+        document["m-import"].text = f"{t_import:.1f} ms"
+
+        # Phase 2: First Execution (Cold)
+        t1 = time.perf_counter()
+        cold_result = run_full_lcc_analysis(sample_input_global, sample_construction_costs)
+        t_cold = (time.perf_counter() - t1) * 1000
+        document["m-cold"].text = f"{t_cold:.1f} ms"
+
+        # Phase 3: Second Execution (Warm)
+        t2 = time.perf_counter()
+        warm_result = run_full_lcc_analysis(sample_input_global, sample_construction_costs)
+        t_warm = (time.perf_counter() - t2) * 1000
+        document["m-warm"].text = f"{t_warm:.1f} ms"
+
+        # Phase 4: Total End-to-End Time
+        total_e2e = (time.perf_counter() - t0) * 1000
+        document["m-total"].text = f"{total_e2e:.1f} ms"
+
+        # Phase 5: RAM Stats
+        document["m-ram"].text = get_ram_stats()
+
+        # Display results
+        document["output"].text = format_json(warm_result)
+        set_status("Auto-Run Completed Successfully!", "status-success")
+        document["timer"].text = f"(Cold: {t_cold:.1f}ms | Warm: {t_warm:.1f}ms)"
+    except Exception as e:
+        import traceback
+        set_status("Auto-Run Failed", "status-error")
+        document["output"].text = f"Error: {e}\n\n{traceback.format_exc()}"
+
+# Execute immediately on script load
+auto_run_benchmark()
+
+# ============================================================
+# INTERACTIVE BUTTON HANDLERS
+# ============================================================
+@bind("#btn-re-run", "click")
+def on_rerun(event):
+    set_status("Running analysis (Warm)...", "status-running")
+    start = time.perf_counter()
+    try:
+        from three_ps_lcca_core.core.main import run_full_lcc_analysis
+        results = run_full_lcc_analysis(sample_input_global, sample_construction_costs)
+        elapsed = (time.perf_counter() - start) * 1000
+        document["m-warm"].text = f"{elapsed:.1f} ms"
+        document["m-ram"].text = get_ram_stats()
+        document["timer"].text = f"(Execution time: {elapsed:.1f} ms)"
+        document["output"].text = format_json(results)
+        set_status("Success!", "status-success")
+    except Exception as e:
+        import traceback
+        document["output"].text = f"Error: {e}\n\n{traceback.format_exc()}"
+        set_status("Failed", "status-error")
+
+@bind("#btn-irc", "click")
+def on_test_irc(event):
+    set_status("Fetching IRC suggestions...", "status-running")
+    start = time.perf_counter()
+    try:
+        from three_ps_lcca_core.core.main import get_IRC_standard_suggestions
+        suggestions = get_IRC_standard_suggestions()
+        elapsed = (time.perf_counter() - start) * 1000
+        document["timer"].text = f"({elapsed:.1f} ms)"
+        document["output"].text = format_json(suggestions)
+        set_status("Success!", "status-success")
+    except Exception as e:
+        import traceback
+        document["output"].text = f"Error: {e}\n\n{traceback.format_exc()}"
+        set_status("Failed", "status-error")
+
+@bind("#btn-detailed", "click")
+def on_test_detailed(event):
+    set_status("Running LCCA with Detailed RUC...", "status-running")
+    start = time.perf_counter()
+    try:
+        from three_ps_lcca_core.core.main import run_full_lcc_analysis
+        results = run_full_lcc_analysis(sample_detailed_input, sample_construction_costs, wpi=sample_detailed_wpi)
+        elapsed = (time.perf_counter() - start) * 1000
+        document["timer"].text = f"({elapsed:.1f} ms)"
+        document["output"].text = format_json(results)
+        set_status("Success!", "status-success")
+    except Exception as e:
+        import traceback
+        document["output"].text = f"Error: {e}\n\n{traceback.format_exc()}"
+        set_status("Failed", "status-error")
+
+@bind("#btn-clear", "click")
+def on_clear(event):
+    document["output"].text = "Output cleared."
+    document["timer"].text = ""
+    set_status("Ready", "status-idle")
+
+@bind("#btn-copy-stats", "click")
+def on_copy_stats(event):
+    m_import = document["m-import"].text
+    m_cold = document["m-cold"].text
+    m_warm = document["m-warm"].text
+    m_total = document["m-total"].text
+    m_ram = document["m-ram"].text
+
+    stats_text = (
+        "3psLCCA Core — Brython Benchmark Results\n"
+        "=========================================\n"
+        "Package: three_ps_lcca_core.brython.js (94 KB raw, 23 KB Gzip)\n"
+        "Runtime: Brython 3.14.3 (In-Browser Client)\n"
+        f"Browser: {window.navigator.userAgent}\n\n"
+        "Performance Timings & Memory:\n"
+        f"- 1. Module Import & Transpile: {m_import}\n"
+        f"- 2. First Run (Cold Execution): {m_cold}\n"
+        f"- 3. Repeat Run (Warm Execution): {m_warm}\n"
+        f"- 4. Total Auto-Run Time:        {m_total}\n"
+        f"- 5. RAM Usage (JS Heap):        {m_ram}\n"
+    )
+
+    try:
+        window.navigator.clipboard.writeText(stats_text)
+    except:
+        # Fallback if clipboard API is blocked
+        ta = document.createElement("textarea")
+        ta.value = stats_text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand("copy")
+        document.body.removeChild(ta)
+
+    btn = document["btn-copy-stats"]
+    btn.text = "✅ Copied to Clipboard!"
+    def reset_btn():
+        btn.text = "📋 Copy Benchmark Stats"
+    window.setTimeout(reset_btn, 2200)
+  </script>
+</body>
+</html>

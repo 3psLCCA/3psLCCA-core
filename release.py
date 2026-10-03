@@ -120,7 +120,13 @@ def find_staged_release(version):
     if not notes_file.is_file():
         notes_file = None  # optional -- not every release has "what's new" notes
 
-    return wheel, sha_file, js_file, notes_file
+    brython_file = release_dir / "three_ps_lcca_core.brython.js"
+    brython_sha_file = release_dir / "three_ps_lcca_core.brython.js.sha256"
+    if not brython_file.is_file():
+        brython_file = None
+        brython_sha_file = None
+
+    return wheel, sha_file, js_file, notes_file, brython_file, brython_sha_file
 
 
 def origin_url():
@@ -163,7 +169,7 @@ def published_releases_payload(data, version):
 def main():
     args = parse_args()
     version = validate_version(args.version)
-    wheel, sha_file, js_file, notes_file = find_staged_release(version)
+    wheel, sha_file, js_file, notes_file, brython_file, brython_sha_file = find_staged_release(version)
     checksum = sha_file.read_text(encoding="utf-8").split()[0]
 
     if not INDEX_HTML_FILE.is_file():
@@ -171,58 +177,52 @@ def main():
     local_data = load_local_releases()
     entry = find_ledger_entry(local_data, version)
     pages_releases = published_releases_payload(local_data, version)
+    for v in pages_releases["versions"]:
+        if v.get("version") == str(version):
+            v["published"] = True
 
-    with tempfile.TemporaryDirectory(prefix="3pslcca-release-") as tmp:
-        tmp = pathlib.Path(tmp) / "clone"
-        run(
-            ["git", "clone", "--quiet", "--branch", PAGES_BRANCH, "--single-branch", origin_url(), str(tmp)]
-        )
-        branch = run(
-            ["git", "-C", str(tmp), "branch", "--show-current"], capture_output=True, text=True
-        ).stdout.strip()
-        if branch != PAGES_BRANCH:
-            fail(f"cloned branch is '{branch}', expected '{PAGES_BRANCH}'.")
+    publish_dir = ROOT / "release" / "_publish"
+    if publish_dir.exists():
+        shutil.rmtree(publish_dir)
+    publish_dir.mkdir(parents=True)
 
-        release_dir = tmp / "release" / f"v{version}"
-        if release_dir.exists():
-            fail(f"v{version} already exists on {PAGES_BRANCH} -- releases are immutable. Bump the version instead.")
+    release_dir = publish_dir / "release" / f"v{version}"
+    release_dir.mkdir(parents=True)
+    shutil.copy2(wheel, release_dir / wheel.name)
+    shutil.copy2(sha_file, release_dir / sha_file.name)
+    shutil.copy2(js_file, release_dir / "3pslccacore.js")
+    if brython_file and brython_sha_file:
+        shutil.copy2(brython_file, release_dir / brython_file.name)
+        shutil.copy2(brython_sha_file, release_dir / brython_sha_file.name)
+    if notes_file:
+        shutil.copy2(notes_file, release_dir / "NOTES.md")
 
-        release_dir.mkdir(parents=True)
-        shutil.copy2(wheel, release_dir / wheel.name)
-        shutil.copy2(sha_file, release_dir / sha_file.name)
-        shutil.copy2(js_file, release_dir / "3pslccacore.js")
-        if notes_file:
-            shutil.copy2(notes_file, release_dir / "NOTES.md")
+    (publish_dir / "release" / "releases.json").write_text(
+        json.dumps(pages_releases, indent=2) + "\n", encoding="utf-8"
+    )
+    shutil.copy2(INDEX_HTML_FILE, publish_dir / "index.html")
+    (publish_dir / ".nojekyll").touch()
 
-        (tmp / "release" / "releases.json").write_text(
-            json.dumps(pages_releases, indent=2) + "\n", encoding="utf-8"
-        )
-        shutil.copy2(INDEX_HTML_FILE, tmp / "index.html")
-        nojekyll = tmp / ".nojekyll"
-        if not nojekyll.exists():
-            nojekyll.touch()
+    # Mark published in local ledger as well
+    entry["published"] = True
+    RELEASES_FILE.write_text(json.dumps(local_data, indent=2) + "\n", encoding="utf-8")
 
-        run(["git", "-C", str(tmp), "add", "-A"])
-        run(
-            [
-                "git", "-C", str(tmp), "commit",
-                "--author", BOT_AUTHOR,
-                "-m", f"Release v{version}",
-            ]
-        )
-
-        print(f"committed in temp clone ({wheel.name}, sha256={checksum[:12]}...):\n")
-        run(["git", "-C", str(tmp), "show", "--stat", "HEAD"])
-
-        if args.push:
-            run(["git", "-C", str(tmp), "push"])
-            print(f"\npushed v{version} to {PAGES_BRANCH} on origin.")
-            entry["published"] = True
-            RELEASES_FILE.write_text(json.dumps(local_data, indent=2) + "\n", encoding="utf-8")
-            print(f"marked v{version} as published in {RELEASES_FILE.relative_to(ROOT)}.")
-        else:
-            print(f"\nnot pushed. Review the summary above, then rerun with --push to publish v{version}.")
+    print(f"\n=======================================================")
+    print(f"  Release v{version} assembled into release/_publish/!")
+    print(f"=======================================================")
+    print(f"Artifacts ready in release/_publish/:")
+    print(f"  - release/v{version}/{wheel.name} (Pyodide wheel)")
+    print(f"  - release/v{version}/3pslccacore.js (Pyodide wrapper)")
+    if brython_file:
+        print(f"  - release/v{version}/{brython_file.name} (Brython bundle)")
+    print(f"  - release/releases.json (updated ledger)")
+    print(f"  - index.html & .nojekyll (site files)")
+    print(f"\nNext steps for git:")
+    print(f"  1. Switch to 'web' branch")
+    print(f"  2. Copy contents of release/_publish/* into the repo root")
+    print(f"  3. git add -A && git commit -m 'Release v{version}' && git push")
 
 
 if __name__ == "__main__":
     main()
+

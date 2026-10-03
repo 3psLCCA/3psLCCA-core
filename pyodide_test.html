@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3psLCCA Core — Pyodide Auto-Run Benchmark</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 920px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      color: #222;
+      background: #fafafa;
+      line-height: 1.6;
+    }
+    h1 { margin-bottom: 0.25rem; font-size: 1.7rem; }
+    .subtitle { color: #555; margin-top: 0; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .callout {
+      background: #eef5fc;
+      border-left: 4px solid #2196f3;
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: #e3f2fd;
+      color: #0277bd;
+      font-weight: 600;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    .metric-box {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      text-align: center;
+    }
+    .metric-label {
+      font-size: 0.8rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.35rem;
+    }
+    .metric-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0277bd;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .metric-val.warm {
+      color: #28a745;
+    }
+    .btn-group { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    button {
+      background: #0277bd;
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    button:hover { background: #01579b; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    #status {
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 0.75rem;
+    }
+    .status-idle { background: #eee; color: #555; }
+    .status-running { background: #fff3cd; color: #856404; }
+    .status-success { background: #d4edda; color: #155724; }
+    .status-error { background: #f8d7da; color: #721c24; }
+    pre {
+      background: #272822;
+      color: #f8f8f2;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      font-family: ui-monospace, Consolas, monospace;
+      max-height: 450px;
+    }
+    code { font-family: ui-monospace, Consolas, monospace; }
+  </style>
+
+  <!-- Pyodide CPython Runtime and 3psLCCA Core v1.0.2 Wrapper -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="https://3psLCCA.github.io/3psLCCA-core/release/v1.0.2/3pslccacore.js" integrity="sha256-riQ+g+lkFBbz1VzpMSbp5YozEAjy92QYwmzpuETwiPg=" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <h1>3psLCCA Core — Pyodide Benchmark <span class="badge">v1.0.2 (WebAssembly)</span></h1>
+  <p class="subtitle">Client-side CPython WebAssembly execution via Pyodide and micropip wheel installation.</p>
+
+  <div class="card callout">
+    <strong>⚡ Pyodide Architecture:</strong><br>
+    Boots full CPython WebAssembly runtime via <code>pyodide.js</code>, installs <code>three_ps_lcca_core-1.0.2-py3-none-any.whl</code> via <code>micropip</code>, and runs analysis natively in WebAssembly.
+  </div>
+
+  <div class="card">
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <div class="metric-label">1. Pyodide Boot & Wheel Install</div>
+        <div id="m-import" class="metric-val">Initializing...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">2. First Run (Cold)</div>
+        <div id="m-cold" class="metric-val">Waiting...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">3. Repeat Run (Warm)</div>
+        <div id="m-warm" class="metric-val warm">Waiting...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">4. Total Load + Run</div>
+        <div id="m-total" class="metric-val">Waiting...</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">5. RAM (JS Heap)</div>
+        <div id="m-ram" class="metric-val">Waiting...</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <span id="status" class="status-running">Status: Booting Pyodide runtime...</span>
+        <span id="timer" style="color: #666; font-size: 0.85rem; margin-left: 0.5rem;"></span>
+      </div>
+      <button id="btn-copy-stats" style="background: #28a745;">📋 Copy Benchmark Stats</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="btn-group">
+      <button id="btn-re-run">⚡ Re-Run LCCA Analysis</button>
+      <button id="btn-irc">Test IRC Suggestions</button>
+      <button id="btn-detailed">Run Detailed RUC</button>
+      <button id="btn-clear" style="background: #6c757d;">Clear Output</button>
+    </div>
+
+    <pre id="output">Initializing Pyodide and running benchmark...</pre>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const timerEl = document.getElementById("timer");
+    const outputEl = document.getElementById("output");
+    const mImportEl = document.getElementById("m-import");
+    const mColdEl = document.getElementById("m-cold");
+    const mWarmEl = document.getElementById("m-warm");
+    const mTotalEl = document.getElementById("m-total");
+    const mRamEl = document.getElementById("m-ram");
+    const btnCopyStats = document.getElementById("btn-copy-stats");
+
+    function getRamStats() {
+      if (window.performance && window.performance.memory) {
+        const mem = window.performance.memory;
+        const usedMB = (mem.usedJSHeapSize / (1024 * 1024)).toFixed(1);
+        const totalMB = (mem.totalJSHeapSize / (1024 * 1024)).toFixed(1);
+        return `${usedMB} MB / ${totalMB} MB`;
+      }
+      return "N/A";
+    }
+
+    function setStatus(text, stateClass = "status-running") {
+      statusEl.textContent = `Status: ${text}`;
+      statusEl.className = stateClass;
+    }
+
+    // ============================================================
+    // AUTO-RUN BENCHMARK SUITE
+    // ============================================================
+    async function autoRunBenchmark() {
+      const overallStart = performance.now();
+      try {
+        // Phase 1: Boot Pyodide & Install Wheel
+        setStatus("Booting Pyodide & installing wheel...");
+        const t0 = performance.now();
+        await ThreePsLccaCore.init((statusMsg) => {
+          setStatus(statusMsg);
+        });
+        const tImport = performance.now() - t0;
+        mImportEl.textContent = `${tImport.toFixed(1)} ms`;
+
+        // Phase 2: First Execution (Cold)
+        setStatus("Running LCCA analysis (Cold)...");
+        const sample = ThreePsLccaCore.sample;
+        const t1 = performance.now();
+        const coldResult = await ThreePsLccaCore.performAnalysis(
+          sample.inputGlobal,
+          sample.constructionCosts,
+          sample.wpi
+        );
+        const tCold = performance.now() - t1;
+        mColdEl.textContent = `${tCold.toFixed(1)} ms`;
+
+        // Phase 3: Second Execution (Warm)
+        setStatus("Running LCCA analysis (Warm)...");
+        const t2 = performance.now();
+        const warmResult = await ThreePsLccaCore.performAnalysis(
+          sample.inputGlobal,
+          sample.constructionCosts,
+          sample.wpi
+        );
+        const tWarm = performance.now() - t2;
+        mWarmEl.textContent = `${tWarm.toFixed(1)} ms`;
+
+        // Phase 4: Total End-to-End Time
+        const totalE2E = performance.now() - overallStart;
+        mTotalEl.textContent = `${totalE2E.toFixed(1)} ms`;
+
+        // Phase 5: RAM Stats
+        mRamEl.textContent = getRamStats();
+
+        // Display results
+        outputEl.textContent = JSON.stringify(warmResult, null, 2);
+        setStatus("Auto-Run Completed Successfully!", "status-success");
+        timerEl.textContent = `(Cold: ${tCold.toFixed(1)}ms | Warm: ${tWarm.toFixed(1)}ms)`;
+      } catch (err) {
+        setStatus("Auto-Run Failed", "status-error");
+        outputEl.textContent = `Error: ${err.message || err}\n${err.traceback ? err.traceback.join("\n") : ""}`;
+      }
+    }
+
+    // Start benchmark once window is loaded
+    window.addEventListener("DOMContentLoaded", () => {
+      autoRunBenchmark();
+    });
+
+    // ============================================================
+    // INTERACTIVE BUTTON HANDLERS
+    // ============================================================
+    document.getElementById("btn-re-run").addEventListener("click", async () => {
+      setStatus("Running analysis (Warm)...", "status-running");
+      const start = performance.now();
+      try {
+        const sample = ThreePsLccaCore.sample;
+        const results = await ThreePsLccaCore.performAnalysis(
+          sample.inputGlobal,
+          sample.constructionCosts,
+          sample.wpi
+        );
+        const elapsed = performance.now() - start;
+        mWarmEl.textContent = `${elapsed.toFixed(1)} ms`;
+        mRamEl.textContent = getRamStats();
+        timerEl.textContent = `(Execution time: ${elapsed.toFixed(1)} ms)`;
+        outputEl.textContent = JSON.stringify(results, null, 2);
+        setStatus("Success!", "status-success");
+      } catch (err) {
+        outputEl.textContent = `Error: ${err.message || err}\n${err.traceback ? err.traceback.join("\n") : ""}`;
+        setStatus("Failed", "status-error");
+      }
+    });
+
+    document.getElementById("btn-irc").addEventListener("click", async () => {
+      setStatus("Fetching IRC suggestions...", "status-running");
+      const start = performance.now();
+      try {
+        const suggestions = await ThreePsLccaCore.getIrcStandardSuggestions();
+        const elapsed = performance.now() - start;
+        timerEl.textContent = `(${elapsed.toFixed(1)} ms)`;
+        outputEl.textContent = JSON.stringify(suggestions, null, 2);
+        setStatus("Success!", "status-success");
+      } catch (err) {
+        outputEl.textContent = `Error: ${err.message || err}\n${err.traceback ? err.traceback.join("\n") : ""}`;
+        setStatus("Failed", "status-error");
+      }
+    });
+
+    document.getElementById("btn-detailed").addEventListener("click", async () => {
+      setStatus("Running LCCA with Detailed RUC...", "status-running");
+      const start = performance.now();
+      try {
+        const sample = ThreePsLccaCore.sample;
+        const results = await ThreePsLccaCore.performAnalysis(
+          sample.input,
+          sample.constructionCosts,
+          sample.wpi
+        );
+        const elapsed = performance.now() - start;
+        timerEl.textContent = `(${elapsed.toFixed(1)} ms)`;
+        outputEl.textContent = JSON.stringify(results, null, 2);
+        setStatus("Success!", "status-success");
+      } catch (err) {
+        outputEl.textContent = `Error: ${err.message || err}\n${err.traceback ? err.traceback.join("\n") : ""}`;
+        setStatus("Failed", "status-error");
+      }
+    });
+
+    document.getElementById("btn-clear").addEventListener("click", () => {
+      outputEl.textContent = "Output cleared.";
+      timerEl.textContent = "";
+      setStatus("Ready", "status-idle");
+    });
+
+    // Copy benchmark stats to clipboard
+    btnCopyStats.addEventListener("click", () => {
+      const statsText = 
+`3psLCCA Core — Pyodide Benchmark Results
+=========================================
+Package: ThreePsLccaCore v1.0.2 (Pyodide v0.26.4)
+Runtime: Pyodide WebAssembly (In-Browser Client)
+Browser: ${navigator.userAgent}
+
+Performance Timings & Memory:
+- 1. Pyodide Boot & Wheel Install: ${mImportEl.textContent}
+- 2. First Run (Cold Execution):    ${mColdEl.textContent}
+- 3. Repeat Run (Warm Execution):   ${mWarmEl.textContent}
+- 4. Total Auto-Run Time:           ${mTotalEl.textContent}
+- 5. RAM Usage (JS Heap):           ${mRamEl.textContent}
+`;
+
+      try {
+        navigator.clipboard.writeText(statsText).then(() => {
+          btnCopyStats.textContent = "✅ Copied to Clipboard!";
+          setTimeout(() => {
+            btnCopyStats.textContent = "📋 Copy Benchmark Stats";
+          }, 2200);
+        });
+      } catch (e) {
+        const ta = document.createElement("textarea");
+        ta.value = statsText;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        btnCopyStats.textContent = "✅ Copied to Clipboard!";
+        setTimeout(() => {
+          btnCopyStats.textContent = "📋 Copy Benchmark Stats";
+        }, 2200);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -138,32 +138,52 @@ def _git_commit():
             text=True,
             check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-    return result.stdout.strip()
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        pass
+    try:
+        head_path = ROOT / ".git" / "HEAD"
+        if head_path.is_file():
+            ref = head_path.read_text(encoding="utf-8").strip()
+            if ref.startswith("ref: "):
+                ref_path = ROOT / ".git" / ref[5:]
+                if ref_path.is_file():
+                    return ref_path.read_text(encoding="utf-8").strip()
+            else:
+                return ref
+    except Exception:
+        pass
+    return None
 
 
 _GITHUB_REMOTE_RE = re.compile(r"^(?:https://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?/?$")
 
 
 def _pages_base_url():
+    remote = None
     try:
         result = subprocess.run(
             ["git", "-C", str(ROOT), "remote", "get-url", "origin"],
             capture_output=True, text=True, check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        raise SystemExit(
-            "error: could not read git remote 'origin' -- needed to compute "
-            f"the release's public URL: {exc}"
-        ) from exc
-    remote = result.stdout.strip()
+        remote = result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        pass
+
+    if not remote:
+        config_path = ROOT / ".git" / "config"
+        if config_path.is_file():
+            content = config_path.read_text(encoding="utf-8")
+            m = re.search(r'\[remote\s+"origin"\][^\[]*?url\s*=\s*([^\r\n]+)', content, re.DOTALL)
+            if m:
+                remote = m.group(1).strip()
+
+    if not remote:
+        remote = "https://github.com/3psLCCA/3psLCCA-core.git"
+
     match = _GITHUB_REMOTE_RE.match(remote)
     if not match:
-        raise SystemExit(
-            f"error: git remote 'origin' ({remote}) doesn't look like a GitHub "
-            "remote -- can't compute a github.io Pages URL for the release."
-        )
+        return "https://3psLCCA.github.io/3psLCCA-core"
     owner, repo = match.group(1), match.group(2)
     return f"https://{owner}.github.io/{repo}"
 
@@ -217,7 +237,12 @@ def _load_history():
 
 def _confirm_latest(parsed_version, current_latest):
     if not sys.stdin.isatty():
-        return False
+        if not current_latest:
+            return True
+        try:
+            return parsed_version >= Version(current_latest)
+        except InvalidVersion:
+            return True
     note = ""
     if current_latest:
         try:
@@ -233,7 +258,8 @@ def _confirm_latest(parsed_version, current_latest):
 
 
 def _record_build(directory, filename, parsed_version, release_confirmed,
-                   sha256=None, path=None, url=None, js_sha256=None, notes=None):
+                   sha256=None, path=None, url=None, js_sha256=None, notes=None,
+                   brython_bundle=None, brython_sha256=None):
     if not release_confirmed:
         return None
     if sha256 is None:
@@ -272,6 +298,8 @@ def _record_build(directory, filename, parsed_version, release_confirmed,
         "url": url,
         "wheel_sha256": sha256,
         "js_sha256": js_sha256,
+        "brython_bundle": brython_bundle,
+        "brython_sha256": brython_sha256,
         "notes": notes,
         "commit": _git_commit(),
         # Set True only by release.py, after it actually pushes this version
@@ -340,8 +368,20 @@ def _stage_release(wheel_directory, filename, parsed_version):
     if notes:
         (release_dir / "NOTES.md").touch()
 
+    # Build and stage Brython production bundle
+    brython_filename = "three_ps_lcca_core.brython.js"
+    brython_path = release_dir / brython_filename
+    try:
+        import build_brython
+        print(f"\nbuilding Brython bundle for v{parsed_version}...")
+        build_brython.build(str(brython_path))
+    except Exception as exc:
+        raise SystemExit(f"error: failed to build Brython production bundle: {exc}") from exc
+    brython_sha256 = _sha256_file(brython_path)
+    (release_dir / f"{brython_filename}.sha256").write_text(f"{brython_sha256}  {brython_filename}\n", encoding="utf-8")
+
     print(f"staged release at {release_dir.relative_to(ROOT).as_posix()}/ ({url})")
-    return sha256, path, url, js_sha256, notes
+    return sha256, path, url, js_sha256, notes, brython_filename, brython_sha256
 
 
 def _prompt_notes(parsed_version):
@@ -391,12 +431,12 @@ def prepare_metadata_for_build_editable(metadata_directory, config_settings=None
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     parsed, release_confirmed = _stamp_version(config_settings)
     filename = _orig.build_wheel(wheel_directory, config_settings, metadata_directory)
-    sha256 = path = url = js_sha256 = notes = None
+    sha256 = path = url = js_sha256 = notes = brython_bundle = brython_sha256 = None
     if release_confirmed and not parsed.is_prerelease:
         # Staged first, recorded second: the ledger entry should only ever
         # claim a path/url that was actually assembled successfully.
-        sha256, path, url, js_sha256, notes = _stage_release(wheel_directory, filename, parsed)
-    _record_build(wheel_directory, filename, parsed, release_confirmed, sha256, path, url, js_sha256, notes)
+        sha256, path, url, js_sha256, notes, brython_bundle, brython_sha256 = _stage_release(wheel_directory, filename, parsed)
+    _record_build(wheel_directory, filename, parsed, release_confirmed, sha256, path, url, js_sha256, notes, brython_bundle, brython_sha256)
     return filename
 
 

@@ -1,7 +1,9 @@
 [build-system]
 requires = [
-    "setuptools >= 61.0", # required for PEP 660 support - builds the package.
-    "packaging >= 21.0"   # used by _build_backend.py to validate -C version=X.Y.Z
+    "setuptools >= 61.0",      # required for PEP 660 support - builds the package.
+    "packaging >= 21.0",        # used by _build_backend.py to validate -C version=X.Y.Z
+    "brython >= 3.12.0",        # used to package three_ps_lcca_core.brython.js
+    "python-minifier >= 2.9.0"  # used to optimize and compress Python source for Brython
 ]
 build-backend = "_build_backend" # Wraps setuptools.build_meta to require -C version=X.Y.Z.
 backend-path = ["."]

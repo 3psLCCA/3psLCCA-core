@@ -48,8 +48,8 @@
       <th>Version</th>
       <th>Date</th>
       <th>Notes</th>
-      <th>3pslccacore.js</th>
-      <th>sha256</th>
+      <th>Pyodide Wrapper</th>
+      <th>Brython Bundle (93 KB)</th>
       <th>Commit</th>
     </tr>
   </thead>
@@ -130,10 +130,18 @@
     }
     tr.appendChild(scriptCell);
 
-    const shaCell = document.createElement("td");
-    shaCell.className = "sha";
-    shaCell.textContent = shortSha(entry.js_sha256);
-    tr.appendChild(shaCell);
+    const brythonCell = document.createElement("td");
+    if (entry.brython_bundle && entry.url) {
+      const a = document.createElement("a");
+      a.href = `${entry.url}/${entry.brython_bundle}`;
+      a.textContent = entry.brython_bundle;
+      brythonCell.appendChild(a);
+    } else if (entry.brython_bundle) {
+      brythonCell.textContent = entry.brython_bundle;
+    } else {
+      brythonCell.textContent = "—";
+    }
+    tr.appendChild(brythonCell);
 
     const commitCell = document.createElement("td");
     commitCell.className = "sha";
@@ -159,9 +167,16 @@
         const integrityAttr = latestEntry.js_sha256
           ? ` integrity="sha256-${hexToBase64(latestEntry.js_sha256)}" crossorigin="anonymous"`
           : "";
-        snippetEl.querySelector("code").textContent =
-`<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script>
+        let snippetText = `<!-- 1. Pyodide Target (WebAssembly, 7 MB) -->
 <script src="${latestEntry.url}/3pslccacore.js"${integrityAttr}><\/script>`;
+
+        if (latestEntry.brython_bundle) {
+          snippetText += `\n\n<!-- 2. Brython Target (Ultra-fast, 93 KB) -->
+<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/brython@3.14.3/brython_stdlib.js"><\/script>
+<script src="${latestEntry.url}/${latestEntry.brython_bundle}"><\/script>`;
+        }
+        snippetEl.querySelector("code").textContent = snippetText;
       } else if (data.latest) {
         statusEl.textContent = `v${data.latest} is marked latest but has no published URL.`;
         statusEl.className = "error";
